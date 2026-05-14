@@ -2,6 +2,7 @@ using NaughtyAttributes;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.LightTransport;
@@ -20,17 +21,20 @@ public class DungeonGeneratorScript : MonoBehaviour
     public float randomSizeMin = 0.05f;
     public float randomSizeMax = 0.75f;
     public int wallHeight = 3;
+    public bool spawnAssets = false;
+    public GameObject wallPrefab;
+    List<Vector3> takenPositions = new List<Vector3>();
     //public int doorSize = 1;
 
     void Start()
     {
-        
+
+        //DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
         GenerateDungeon();
-        DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
     }
 
     [Button]
-    void GenerateDungeon() 
+    void GenerateDungeon()
     {
         DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
         roomsToDraw.Clear();
@@ -68,7 +72,37 @@ public class DungeonGeneratorScript : MonoBehaviour
                     AlgorithmsUtils.DebugRectInt(r, Color.yellow/*, 1000f, false, wallHeight*/);
                 });
             }
+            if (spawnAssets)
+            {
+                SpawnAssets();
+            }
             //DrawDoorsI();
+        }
+    }
+
+    private void SpawnAssets() 
+    {
+        GameObject wallsParent = new GameObject();
+        wallsParent.name = "Walls";
+        Transform transform = wallsParent.transform;
+        takenPositions.Clear();
+        foreach (var r in roomsToDraw)
+        {
+            for (int i = 0; i <= r.width; i++)
+            {
+                for (int j = 0; j <= r.height; j++)
+                {
+                    if (i == 0 || i == r.width || j == 0 || j == r.height)
+                    {
+                        takenPositions.Add(new Vector3(r.xMin + i, 0.5f, r.yMin + j));
+                    }
+                }
+            }
+        }
+        foreach (var position in takenPositions)
+        {
+            wallPrefab.transform.position = position;
+            Instantiate(wallPrefab, transform);
         }
     }
 
@@ -110,9 +144,9 @@ public class DungeonGeneratorScript : MonoBehaviour
         if (RandomBool())
         {
             // X
-            if (room.width < minRoomSize * 2 + wallSize) return false;
+            if (room.width < minRoomSize * 2) return false;
 
-            int usable = room.width - wallSize;                 // CHANGED: total room space after wall
+            int usable = room.width;                 // CHANGED: total room space after wall
             float minRatio = (float)minRoomSize / usable;       // CHANGED
             float r = UnityEngine.Random.Range(randomSizeMin, randomSizeMax);   // CHANGED
             if (r < minRatio) r = minRatio;                     // CHANGED (clamp)
@@ -134,9 +168,9 @@ public class DungeonGeneratorScript : MonoBehaviour
         else
         {
             // Y
-            if (room.height < minRoomSize * 2 + wallSize) return false;
+            if (room.height < minRoomSize * 2) return false;
 
-            int usable = room.height - wallSize;                // CHANGED
+            int usable = room.height;                // CHANGED
             float minRatio = (float)minRoomSize / usable;       // CHANGED
             float r = UnityEngine.Random.Range(randomSizeMin, randomSizeMax);   // CHANGED
             if (r < minRatio) r = minRatio;                     // CHANGED
@@ -160,8 +194,8 @@ public class DungeonGeneratorScript : MonoBehaviour
     public bool IsSplittable(RectInt room, bool splitDirection)
     {
         if (splitDirection)
-            if (room.height >= minRoomSize * 2 + wallSize) return true; else return false;
-        else if (room.width >= minRoomSize * 2 + wallSize) return true; else return false;
+            if (room.height >= minRoomSize * 2) return true; else return false;
+        else if (room.width >= minRoomSize * 2) return true; else return false;
     }
 
     public bool RandomBool()
