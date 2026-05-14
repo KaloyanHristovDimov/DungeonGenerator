@@ -500,7 +500,6 @@ MonoBehaviour:
   randomSizeMin: 0.05
   randomSizeMax: 0.75
   wallHeight: 3
-  doorSize: 1
 --- !u!4 &1411615435
 Transform:
   m_ObjectHideFlags: 0

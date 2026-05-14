@@ -1,3 +1,4 @@
+using NaughtyAttributes;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -22,8 +23,17 @@ public class DungeonGeneratorScript : MonoBehaviour
 
     void Start()
     {
+        
+        GenerateDungeon();
+    }
+
+    [Button]
+    void GenerateDungeon() 
+    {
+        roomsToDraw.Clear();
         RectInt baseRoom = startRoomParams;
         roomsToDraw.Add(baseRoom);
+        keepDividing = true;
         while (keepDividing)
         {
             keepDividing = false;
@@ -43,7 +53,7 @@ public class DungeonGeneratorScript : MonoBehaviour
             foreach (var room in newRooms) roomsToDraw.Add(room);
             newRooms.Clear();
         }
-        AlgorithmsUtils.DebugRectInt(baseRoom, Color.yellow, 1000f, false, wallHeight);
+        AlgorithmsUtils.DebugRectInt(roomsToDraw[0], Color.yellow, 1000f, false, wallHeight);
         //FixDoorsAfterSplits();
         if (wait) StartCoroutine(DrawRooms());
         else
@@ -85,7 +95,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
     private bool TrySplit(RectInt room, out RectInt roomA, out RectInt roomB)
     {
-        roomA = default;
+        roomA = default ;
         roomB = default;
 
         if (RandomBool())
