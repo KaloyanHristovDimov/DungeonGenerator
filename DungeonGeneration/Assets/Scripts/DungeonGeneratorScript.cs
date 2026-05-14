@@ -9,7 +9,6 @@ using UnityEngine.LightTransport;
 
 public class DungeonGeneratorScript : MonoBehaviour
 {
-    public int wallSize = 1;
     public int minRoomSize = 5;
     public RectInt startRoomParams = new RectInt(0, 0, 100, 100);
     List<RectInt> roomsToDraw = new List<RectInt>();
@@ -24,6 +23,8 @@ public class DungeonGeneratorScript : MonoBehaviour
     public bool spawnAssets = false;
     public GameObject wallPrefab;
     List<Vector3> takenPositions = new List<Vector3>();
+    public GameObject floorPrefab;
+    public GameObject cellingPrefab;
     //public int doorSize = 1;
 
     void Start()
@@ -82,10 +83,42 @@ public class DungeonGeneratorScript : MonoBehaviour
 
     private void SpawnAssets() 
     {
+        takenPositions.Clear();
+        SpawnWalls();
+        SpawnFloorAndCelling();
+    }
+
+    private void SpawnFloorAndCelling() 
+    {
+        GameObject FloorParent = new GameObject();
+        FloorParent.name = "Floor";
+        Transform floorTransform = FloorParent.transform;
+
+        GameObject CellingParent = new GameObject();
+        CellingParent.name = "Celling";
+        Transform cellingTransform = CellingParent.transform;
+
+        for (int i = 0; i < startRoomParams.width; i++) 
+        {
+            for (int j = 0; j < startRoomParams.height; j++)
+            {
+                if (!takenPositions.Contains(new Vector3(i, 0.5f, j))) 
+                {
+                    floorPrefab.transform.position = new Vector3(i, 0f, j);
+                    cellingPrefab.transform.position = new Vector3(i, wallHeight, j);
+
+                    Instantiate(floorPrefab, floorTransform);
+                    Instantiate(cellingPrefab, cellingTransform);
+                }
+            }
+        }
+    }
+
+    private void SpawnWalls() 
+    {
         GameObject wallsParent = new GameObject();
         wallsParent.name = "Walls";
         Transform transform = wallsParent.transform;
-        takenPositions.Clear();
         foreach (var r in roomsToDraw)
         {
             for (int i = 0; i <= r.width; i++)
@@ -99,10 +132,15 @@ public class DungeonGeneratorScript : MonoBehaviour
                 }
             }
         }
-        foreach (var position in takenPositions)
+        for (int i = 0; i < wallHeight; i++) 
         {
-            wallPrefab.transform.position = position;
-            Instantiate(wallPrefab, transform);
+            foreach (var position in takenPositions)
+            {
+                Vector3 spawnPosition = position;
+                spawnPosition.y = i + 0.5f;
+                wallPrefab.transform.position = spawnPosition;
+                Instantiate(wallPrefab, transform);
+            }
         }
     }
 
