@@ -2,6 +2,7 @@ using NaughtyAttributes;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.LightTransport;
 
@@ -25,11 +26,13 @@ public class DungeonGeneratorScript : MonoBehaviour
     {
         
         GenerateDungeon();
+        DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
     }
 
     [Button]
     void GenerateDungeon() 
     {
+        DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
         roomsToDraw.Clear();
         RectInt baseRoom = startRoomParams;
         roomsToDraw.Add(baseRoom);
@@ -53,14 +56,17 @@ public class DungeonGeneratorScript : MonoBehaviour
             foreach (var room in newRooms) roomsToDraw.Add(room);
             newRooms.Clear();
         }
-        AlgorithmsUtils.DebugRectInt(roomsToDraw[0], Color.yellow, 1000f, false, wallHeight);
+        //AlgorithmsUtils.DebugRectInt(roomsToDraw[0], Color.yellow, 1000f, false, wallHeight);
         //FixDoorsAfterSplits();
         if (wait) StartCoroutine(DrawRooms());
         else
         {
             foreach (var r in roomsToDraw)
             {
-                AlgorithmsUtils.DebugRectInt(r, Color.yellow, 1000f, false, wallHeight);
+                DebugDrawingBatcher.GetInstance().BatchCall(() =>
+                {
+                    AlgorithmsUtils.DebugRectInt(r, Color.yellow/*, 1000f, false, wallHeight*/);
+                });
             }
             //DrawDoorsI();
         }
@@ -78,7 +84,10 @@ public class DungeonGeneratorScript : MonoBehaviour
     {
         foreach (var r in roomsToDraw)
         {
-            AlgorithmsUtils.DebugRectInt(r, Color.yellow, 1000f, false, wallHeight);
+            DebugDrawingBatcher.GetInstance().BatchCall(() =>
+            {
+                AlgorithmsUtils.DebugRectInt(r, Color.yellow/*, 1000f, false, wallHeight*/);
+            });
             yield return new WaitForSeconds(0.1f);
         }
         //StartCoroutine(DrawDoors());
