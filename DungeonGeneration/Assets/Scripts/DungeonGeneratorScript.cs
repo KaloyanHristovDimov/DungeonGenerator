@@ -18,7 +18,6 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private float randomSizeMin = 0.05f;
     [SerializeField] private float randomSizeMax = 0.75f;
     [SerializeField] private int wallHeight = 2;
-    [SerializeField] private bool spawnAssets = false;
     [SerializeField] private GameObject wallPrefab;
     [SerializeField] private GameObject floorPrefab;
     [SerializeField] private GameObject cellingPrefab;
@@ -51,14 +50,36 @@ public class DungeonGeneratorScript : MonoBehaviour
     }
 
     [Button]
-    void GenerateDungeon()
+    private void GenerateDungeon()
     {
         DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
+        
+        AddBaseRoom();
+
+        DivideRooms();
+
+        if (wait) StartCoroutine(DrawRoomsCoroutine());
+        else
+        {
+            DrawRooms();
+        }
+
+        FindIntersections();
+        SpawnAssets();
+
+        SpawnNavMeshAndPlayer();
+    }
+
+    private void AddBaseRoom() 
+    {
         roomsToDraw.Clear();
 
         RectInt baseRoom = startRoomParams;
         roomsToDraw.Add(baseRoom);
+    }
 
+    private void DivideRooms() 
+    {
         keepDividing = true;
 
         while (keepDividing)
@@ -80,31 +101,17 @@ public class DungeonGeneratorScript : MonoBehaviour
             foreach (var room in newRooms) roomsToDraw.Add(room);
             newRooms.Clear();
         }
+    }
 
-        if (wait) StartCoroutine(DrawRooms());
-        else
+    private void DrawRooms()
+    {
+        foreach (var r in roomsToDraw)
         {
-            foreach (var r in roomsToDraw)
+            DebugDrawingBatcher.GetInstance().BatchCall(() =>
             {
-                DebugDrawingBatcher.GetInstance().BatchCall(() =>
-                {
-                    AlgorithmsUtils.DebugRectInt(r, Color.yellow);
-                });
-            }
+                AlgorithmsUtils.DebugRectInt(r, Color.yellow);
+            });
         }
-
-        if (spawnAssets)
-        {
-            FindIntersections();
-            SpawnAssets();
-        }
-
-        GameObject navmesh = Instantiate(navMesh);
-        navMeshSurface = navmesh.GetComponent<NavMeshSurface>();
-        navMeshSurface.BuildNavMesh();
-        GameObject player = Instantiate(playerPrefab);
-        NavMeshAgent navMeshAgent = player.GetComponent<NavMeshAgent>();
-        //Debug.Log("Is on NavMesh: " + navMeshAgent.isOnNavMesh);
     }
 
     private void FindIntersections()
@@ -233,7 +240,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
-    IEnumerator DrawRooms()
+    private IEnumerator DrawRoomsCoroutine()
     {
         foreach (var r in roomsToDraw)
         {
@@ -300,17 +307,19 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
-    public bool IsSplittable(RectInt room, bool splitDirection)
-    {
-        if (splitDirection)
-            if (room.height >= minRoomSize * 2) return true; else return false;
-        else if (room.width >= minRoomSize * 2) return true; else return false;
-    }
-
-    public bool RandomBool()
+    private bool RandomBool()
     {
         int number = UnityEngine.Random.Range(0, 10000);
         if (number % 2 == 0) return true;
         else return false;
+    }
+
+    private void SpawnNavMeshAndPlayer() 
+    {
+        GameObject navmesh = Instantiate(navMesh);
+        navMeshSurface = navmesh.GetComponent<NavMeshSurface>();
+        navMeshSurface.BuildNavMesh();
+        GameObject player = Instantiate(playerPrefab);
+        NavMeshAgent navMeshAgent = player.GetComponent<NavMeshAgent>();
     }
 }
