@@ -2,9 +2,11 @@ using NaughtyAttributes;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.AI.Navigation;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.LightTransport;
 using UnityEngine.UIElements;
 
@@ -21,6 +23,8 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private GameObject floorPrefab;
     [SerializeField] private GameObject cellingPrefab;
     [SerializeField] private GameObject doorPrefab;
+    [SerializeField] private GameObject playerPrefab;
+    [SerializeField] private GameObject navMesh;
     private List<RectInt> roomsToDraw = new List<RectInt>();
     private List<RectInt> newRooms = new List<RectInt>();
     private List<RectInt> roomsToRemove = new List<RectInt>();
@@ -39,6 +43,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
     private List<Vector3Line> vector3Lines = new List<Vector3Line>();
+    private NavMeshSurface navMeshSurface = null;
 
     void Start()
     {
@@ -93,6 +98,13 @@ public class DungeonGeneratorScript : MonoBehaviour
             FindIntersections();
             SpawnAssets();
         }
+
+        GameObject navmesh = Instantiate(navMesh);
+        navMeshSurface = navmesh.GetComponent<NavMeshSurface>();
+        navMeshSurface.BuildNavMesh();
+        GameObject player = Instantiate(playerPrefab);
+        NavMeshAgent navMeshAgent = player.GetComponent<NavMeshAgent>();
+        //Debug.Log("Is on NavMesh: " + navMeshAgent.isOnNavMesh);
     }
 
     private void FindIntersections()
