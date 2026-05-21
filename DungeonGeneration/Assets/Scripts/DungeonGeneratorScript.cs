@@ -23,7 +23,10 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private GameObject cellingPrefab;
     [SerializeField] private GameObject doorPrefab;
     [SerializeField] private GameObject playerPrefab;
+    [SerializeField] private GameObject cameraPrefab;
     [SerializeField] private GameObject navMesh;
+    [SerializeField] private GameObject UIPrefab;
+    [SerializeField] private GameObject EventSystem;
     private List<RectInt> roomsToDraw = new List<RectInt>();
     private List<RectInt> newRooms = new List<RectInt>();
     private List<RectInt> roomsToRemove = new List<RectInt>();
@@ -320,6 +323,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         navMeshSurface = navmesh.GetComponent<NavMeshSurface>();
         navMeshSurface.BuildNavMesh();
         GameObject player = Instantiate(playerPrefab);
+        GameObject camera = Instantiate(cameraPrefab);
+        player.AddComponent<PlayerController>();
         NavMeshAgent navMeshAgent = player.GetComponent<NavMeshAgent>();
+        GameObject UI = Instantiate(UIPrefab);
+        GameObject eventSystem = Instantiate(EventSystem);
     }
 }
