@@ -8,16 +8,19 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.LightTransport;
+using UnityEngine.Tilemaps;
 using UnityEngine.UIElements;
+using static UnityEngine.Rendering.DebugUI.Table;
 
 public class DungeonGeneratorScript : MonoBehaviour
 {
-    [SerializeField] private int minRoomSize = 5;
+    [SerializeField] private int minRoomSize = 6;
     [SerializeField] private RectInt startRoomParams = new RectInt(0, 0, 100, 100);
     [SerializeField] private bool wait = false;
     [SerializeField] private float randomSizeMin = 0.05f;
     [SerializeField] private float randomSizeMax = 0.75f;
     [SerializeField] private int wallHeight = 2;
+    [SerializeField] private List<GameObject> wallPrefabs;
     [SerializeField] private GameObject wallPrefab;
     [SerializeField] private GameObject floorPrefab;
     [SerializeField] private GameObject cellingPrefab;
@@ -27,8 +30,8 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private GameObject navMesh;
     [SerializeField] private GameObject UIPrefab;
     [SerializeField] private GameObject EventSystem;
-    [SerializeField] private int generationsBeforePreservedRooms = 3;
-    [SerializeField] private int preservedRoomChance = 3;
+    [SerializeField] private int generationsBeforePreservedRooms = 10;
+    [SerializeField] private int preservedRoomChance = 10;
     private List<RectInt> roomsPreserved = new List<RectInt>();
     private List<RectInt> roomsToDraw = new List<RectInt>();
     private List<RectInt> newRooms = new List<RectInt>();
@@ -278,12 +281,12 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         RemoveSmallestRooms();
 
-        DrawRooms();
-
         FindIntersections();
         SpawnAssets();
 
         SpawnNavMeshAndPlayer();
+
+        DrawRooms();
     }
 
     private void AddBaseRoom() 
@@ -455,33 +458,99 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
-    private void SpawnWalls() 
-    {
-        GameObject wallsParent = new GameObject();
-        wallsParent.name = "Walls";
-        Transform transform = wallsParent.transform;
+    //private void SpawnWalls() 
+    //{
+    //    GameObject wallsParent = new GameObject();
+    //    wallsParent.name = "Walls";
+    //    Transform transform = wallsParent.transform;
 
+    //    foreach (var r in roomsToDraw)
+    //    {
+    //        for (int i = 0; i <= r.width; i++)
+    //        {
+    //            for (int j = 0; j <= r.height; j++)
+    //            {
+    //                if ((i == 0 || i == r.width || j == 0 || j == r.height) && !doors.Contains(new Vector3 (r.xMin + i, 0.5f, r.yMin + j)))
+    //                {
+    //                    takenPositions.Add(new Vector3(r.xMin + i, 0.5f, r.yMin + j));
+    //                }
+    //            }
+    //        }
+    //    }
+    //    for (int i = 0; i < wallHeight; i++) 
+    //    {
+    //        foreach (var position in takenPositions)
+    //        {
+    //            Vector3 spawnPosition = position;
+    //            spawnPosition.y = i + 0.5f;
+    //            wallPrefab.transform.position = spawnPosition;
+    //            Instantiate(wallPrefab, transform);
+    //        }
+    //    }
+    //}
+
+    private void SetTakenPositions() 
+    {
         foreach (var r in roomsToDraw)
         {
             for (int i = 0; i <= r.width; i++)
             {
                 for (int j = 0; j <= r.height; j++)
                 {
-                    if ((i == 0 || i == r.width || j == 0 || j == r.height) && !doors.Contains(new Vector3 (r.xMin + i, 0.5f, r.yMin + j)))
+                    if ((i == 0 || i == r.width || j == 0 || j == r.height) && !doors.Contains(new Vector3(r.xMin + i, 0.5f, r.yMin + j)))
                     {
                         takenPositions.Add(new Vector3(r.xMin + i, 0.5f, r.yMin + j));
                     }
                 }
             }
         }
-        for (int i = 0; i < wallHeight; i++) 
+    }
+
+    private int[,] GenerateTileMap() 
+    {
+        int[,] tileMap = new int[startRoomParams.width, startRoomParams.height];
+        int rows = tileMap.GetLength(0);
+        int cols = tileMap.GetLength(1);
+
+        //Fill the map with empty spaces
+        for (int i = 0; i <= rows - 1; i++)
         {
-            foreach (var position in takenPositions)
+            for (int j = 0; j <= cols - 1; j++)
             {
-                Vector3 spawnPosition = position;
-                spawnPosition.y = i + 0.5f;
-                wallPrefab.transform.position = spawnPosition;
-                Instantiate(wallPrefab, transform);
+                tileMap[i, j] = 0;
+            }
+        }
+
+        foreach (Vector3 position in takenPositions)
+        {
+            tileMap[(int)(position.x - 0.5f), (int)(position.z - 0.5f)] = 1;
+        }
+
+        return tileMap;
+    }
+
+    private void SpawnWalls()
+    {
+        SetTakenPositions();
+        int[,] tileMap = GenerateTileMap();
+        int rows = tileMap.GetLength(0);
+        int cols = tileMap.GetLength(1);
+        GameObject wallsParent = new GameObject("Walls");
+
+        for (int i = 0; i <= rows - 2; i++)
+        {
+            for (int j = 0; j <= cols - 2; j++)
+            {
+                int prefabNumber = (tileMap[i, j] * (int)Math.Pow(2, 0))
+                    + (tileMap[i, j + 1] * (int)Math.Pow(2, 1))
+                    + (tileMap[i + 1, j + 1] * (int)Math.Pow(2, 2))
+                    + (tileMap[i + 1, j] * (int)Math.Pow(2, 3));
+                if (prefabNumber != 0)
+                {
+                    GameObject wallToInstantiate = wallPrefabs[prefabNumber];
+                    wallToInstantiate.transform.position = new Vector3(i + 1f, 0f, j + 1f);
+                    Instantiate(wallToInstantiate, wallsParent.transform);
+                }
             }
         }
     }

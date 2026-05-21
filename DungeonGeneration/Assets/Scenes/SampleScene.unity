@@ -351,7 +351,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8f13afba715b0af4383e3e90cb853358, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  minRoomSize: 5
+  minRoomSize: 6
   startRoomParams:
     x: 0
     y: 0
@@ -361,6 +361,23 @@ MonoBehaviour:
   randomSizeMin: 0.05
   randomSizeMax: 0.75
   wallHeight: 2
+  wallPrefabs:
+  - {fileID: 4007745676147069824, guid: a4a5f9249e7746144a150e6b590e3c0f, type: 3}
+  - {fileID: 4038827269175978573, guid: 8c9cc736ad3c4ab4087aade106396a5d, type: 3}
+  - {fileID: 3536731398422851134, guid: 1baa95304ce7d1c459443df8de1457e8, type: 3}
+  - {fileID: 7514916297929841920, guid: 931432e0665eb58469d2485b15077dc0, type: 3}
+  - {fileID: 1929578581665396683, guid: cf01063069e735648ab8a1c748d2da83, type: 3}
+  - {fileID: 4007745676147069824, guid: a4a5f9249e7746144a150e6b590e3c0f, type: 3}
+  - {fileID: 6836559720073715965, guid: c6f83813070bea041a9a0e107ab51f59, type: 3}
+  - {fileID: 6898582374593550339, guid: ae8cbe638b9f7074dbc7244fb3c26600, type: 3}
+  - {fileID: 5967930082345930632, guid: a9b3b91ceb6f1134ca74cce01b6a78a8, type: 3}
+  - {fileID: 4826982777467161412, guid: bab40014c6bafe441b1a47834f863221, type: 3}
+  - {fileID: 4007745676147069824, guid: a4a5f9249e7746144a150e6b590e3c0f, type: 3}
+  - {fileID: 1040310750116940119, guid: b691f74e537589c45b55947cb8bfa721, type: 3}
+  - {fileID: 4102568016840167935, guid: 2845a60bcd2f5514e93bad2c324f8d31, type: 3}
+  - {fileID: 1040310750116940119, guid: 988bdb5b8c8e5684f82e8aa72c31960a, type: 3}
+  - {fileID: 2891759284571720867, guid: ef501ae38d35df8469fa26679054f194, type: 3}
+  - {fileID: 4007745676147069824, guid: a4a5f9249e7746144a150e6b590e3c0f, type: 3}
   wallPrefab: {fileID: 2218717143617821881, guid: 614eab2f721ec9c4892df631195bd8ca, type: 3}
   floorPrefab: {fileID: 9000173560118708085, guid: eed0e49390e44ce429d1b1da405124e5, type: 3}
   cellingPrefab: {fileID: 4007745676147069824, guid: a4a5f9249e7746144a150e6b590e3c0f, type: 3}
@@ -369,9 +386,8 @@ MonoBehaviour:
   navMesh: {fileID: 401706191864126830, guid: 0dca86ec291cb0842a672d405aedff4a, type: 3}
   UIPrefab: {fileID: 2699573833096480216, guid: 0eb33d885e1a0cf429caa01c72c58cf4, type: 3}
   EventSystem: {fileID: 2544084172373283389, guid: c3555ab6a3fc52845beb0ffe5057582b, type: 3}
-  generationsBeforePreservedRooms: 3
-  preservedRoomChance: 3
-  smallRoomsToRemove: 10
+  generationsBeforePreservedRooms: 10
+  preservedRoomChance: 10
 --- !u!4 &1411615435
 Transform:
   m_ObjectHideFlags: 0
