@@ -29,7 +29,6 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private GameObject EventSystem;
     [SerializeField] private int generationsBeforePreservedRooms = 3;
     [SerializeField] private int preservedRoomChance = 3;
-    [SerializeField] private int smallRoomsToRemove = 10;
     private List<RectInt> roomsPreserved = new List<RectInt>();
     private List<RectInt> roomsToDraw = new List<RectInt>();
     private List<RectInt> newRooms = new List<RectInt>();
@@ -162,6 +161,7 @@ public class DungeonGeneratorScript : MonoBehaviour
     private void RemoveSmallestRooms() 
     {
         roomsToRemove.Clear();
+        int smallRoomsToRemove = (int)(roomsToDraw.Count / 10);
         for (int i = 0; i < smallRoomsToRemove; i++) 
         {
             RectInt smallestRoom = roomsToDraw[0];
@@ -207,13 +207,9 @@ public class DungeonGeneratorScript : MonoBehaviour
         GameObject CellingParent = new GameObject();
         CellingParent.name = "Celling";
         Transform cellingTransform = CellingParent.transform;
-        //RectInt smth = new RectInt(0, 0, 0, 0); ;
+
         foreach (var room in roomsToDraw)
         {
-            DebugDrawingBatcher.GetInstance().BatchCall(() =>
-            {
-                AlgorithmsUtils.DebugRectInt(room, Color.green);
-            });
             for (int i = 0; i < room.height; i++)
             {
                 for (int j = 0; j < room.width; j++)
@@ -464,14 +460,6 @@ public class DungeonGeneratorScript : MonoBehaviour
         GameObject wallsParent = new GameObject();
         wallsParent.name = "Walls";
         Transform transform = wallsParent.transform;
-
-        foreach (var room in roomsToRemove) 
-        {
-            DebugDrawingBatcher.GetInstance().BatchCall(() =>
-            {
-                AlgorithmsUtils.DebugRectInt(room, Color.red);
-            });
-        }
 
         foreach (var r in roomsToDraw)
         {
