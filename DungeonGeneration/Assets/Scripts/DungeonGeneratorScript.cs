@@ -21,12 +21,15 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private GameObject wallPrefab;
     [SerializeField] private GameObject floorPrefab;
     [SerializeField] private GameObject cellingPrefab;
-    [SerializeField] private GameObject doorPrefab;
+    //[SerializeField] private GameObject doorPrefab;
     [SerializeField] private GameObject playerPrefab;
     [SerializeField] private GameObject cameraPrefab;
     [SerializeField] private GameObject navMesh;
     [SerializeField] private GameObject UIPrefab;
     [SerializeField] private GameObject EventSystem;
+    [SerializeField] private int generationsBeforePreservedRooms = 3;
+    [SerializeField] private int preservedRoomChance = 3;
+    private List<RectInt> roomsPreserved = new List<RectInt>();
     private List<RectInt> roomsToDraw = new List<RectInt>();
     private List<RectInt> newRooms = new List<RectInt>();
     private List<RectInt> roomsToRemove = new List<RectInt>();
@@ -49,7 +52,173 @@ public class DungeonGeneratorScript : MonoBehaviour
 
     void Start()
     {
-        GenerateDungeon();
+        if (wait)
+            StartCoroutine(SlowGenerateDungeon());
+        else
+            GenerateDungeon();
+    }
+
+    private IEnumerator SlowGenerateDungeon() 
+    {
+        DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
+
+        AddBaseRoom();
+
+        yield return StartCoroutine(SlowDivideRooms());
+
+        AddPreservedRooms();
+
+        DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
+
+        FindIntersections();
+
+        yield return StartCoroutine(SlowSpawnAssets());
+
+        SpawnNavMeshAndPlayer();
+    }
+
+    private IEnumerator SlowDivideRooms() 
+    {
+        keepDividing = true;
+        int generation = 0;
+        while (keepDividing)
+        {
+            //DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
+            keepDividing = false;
+            foreach (var room in roomsToDraw)
+            {
+                generation++;
+                if (TrySplit(room, out RectInt roomA, out RectInt roomB))
+                {
+                    bool preserveRoom = false;
+                    if (generation >= generationsBeforePreservedRooms)
+                    {
+                        List<int> ints = new List<int>();
+                        for (int i = 0; i < preservedRoomChance; i++) 
+                        {
+                            int number = UnityEngine.Random.Range(0, 100);
+                            ints.Add(number);
+                        }
+                        int numberToPreserve = UnityEngine.Random.Range(0, 100);
+                        foreach (int i in ints)
+                        {
+                            if (i == numberToPreserve) 
+                            {
+                                preserveRoom = true;
+                            }
+                        }
+                    }
+                    if (!preserveRoom)
+                    {
+                        DebugDrawingBatcher.GetInstance().BatchCall(() =>
+                        {
+                            AlgorithmsUtils.DebugRectInt(room, Color.green);
+                        });
+                        yield return new WaitForSeconds(0.3f);
+                        DebugDrawingBatcher.GetInstance().BatchCall(() =>
+                        {
+                            AlgorithmsUtils.DebugRectInt(roomA, Color.yellow);
+                            AlgorithmsUtils.DebugRectInt(roomB, Color.yellow);
+                        });
+                        yield return new WaitForSeconds(0.1f);
+                        roomsToRemove.Add(room);
+                        newRooms.Add(roomA);
+                        newRooms.Add(roomB);
+                        keepDividing = true;
+                    }
+                    else 
+                    {
+                        DebugDrawingBatcher.GetInstance().BatchCall(() =>
+                        {
+                            AlgorithmsUtils.DebugRectInt(room, Color.blue);
+                        });
+                        yield return new WaitForSeconds(0.3f);
+                        roomsPreserved.Add(room);
+                        roomsToRemove.Add(room);
+                        keepDividing = true;
+                    }
+                   
+                }
+            }
+        foreach (var room in roomsToRemove) roomsToDraw.Remove(room);
+        roomsToRemove.Clear();
+
+        foreach (var room in newRooms) roomsToDraw.Add(room);
+        newRooms.Clear();
+    }
+}
+
+    private void AddPreservedRooms() 
+    {
+        foreach (var room in roomsPreserved) 
+        {
+            roomsToDraw.Add(room);
+        }
+    }
+
+    private IEnumerator SlowSpawnAssets()
+    {
+        takenPositions.Clear();
+        yield return StartCoroutine(SlowSpawnWalls());
+        yield return StartCoroutine(SlowSpawnFloorAndCelling());
+    }
+
+    private IEnumerator SlowSpawnFloorAndCelling()
+    {
+        GameObject FloorParent = new GameObject();
+        FloorParent.name = "Floor";
+        Transform floorTransform = FloorParent.transform;
+
+        GameObject CellingParent = new GameObject();
+        CellingParent.name = "Celling";
+        Transform cellingTransform = CellingParent.transform;
+
+        for (int i = 0; i < startRoomParams.width; i++)
+        {
+            for (int j = 0; j < startRoomParams.height; j++)
+            {
+                if (!takenPositions.Contains(new Vector3(i, 0.5f, j)))
+                {
+                    floorPrefab.transform.position = new Vector3(i, 0f, j);
+                    cellingPrefab.transform.position = new Vector3(i, wallHeight, j);
+
+                    Instantiate(floorPrefab, floorTransform);
+                    Instantiate(cellingPrefab, cellingTransform);
+                    yield return new WaitForSeconds(0.001f);
+                }
+            }
+        }
+    }
+
+    private IEnumerator SlowSpawnWalls()
+    {
+        GameObject wallsParent = new GameObject();
+        wallsParent.name = "Walls";
+        Transform transform = wallsParent.transform;
+        foreach (var r in roomsToDraw)
+        {
+            for (int i = 0; i <= r.width; i++)
+            {
+                for (int j = 0; j <= r.height; j++)
+                {
+                    if ((i == 0 || i == r.width || j == 0 || j == r.height) && !doors.Contains(new Vector3(r.xMin + i, 0.5f, r.yMin + j)))
+                    {
+                        takenPositions.Add(new Vector3(r.xMin + i, 0.5f, r.yMin + j));
+                    }
+                }
+            }
+        }
+        for (int i = 0; i < wallHeight; i++)
+        {
+            foreach (var position in takenPositions)
+            {
+                Vector3 spawnPosition = position;
+                spawnPosition.y = i + 0.5f;
+                wallPrefab.transform.position = spawnPosition;
+                Instantiate(wallPrefab, transform);
+                yield return new WaitForSeconds(0.001f);
+            }
+        }
     }
 
     [Button]
@@ -61,11 +230,9 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         DivideRooms();
 
-        if (wait) StartCoroutine(DrawRoomsCoroutine());
-        else
-        {
-            DrawRooms();
-        }
+        AddPreservedRooms();
+
+        DrawRooms();
 
         FindIntersections();
         SpawnAssets();
@@ -84,18 +251,47 @@ public class DungeonGeneratorScript : MonoBehaviour
     private void DivideRooms() 
     {
         keepDividing = true;
-
+        int generation = 0;
         while (keepDividing)
         {
             keepDividing = false;
+            generation++;
             foreach (var room in roomsToDraw)
             {
                 if (TrySplit(room, out RectInt roomA, out RectInt roomB))
                 {
-                    roomsToRemove.Add(room);
-                    newRooms.Add(roomA);
-                    newRooms.Add(roomB);
-                    keepDividing = true;
+                    bool preserveRoom = false;
+                    if (generation >= generationsBeforePreservedRooms)
+                    {
+                        List<int> ints = new List<int>();
+                        for (int i = 0; i < preservedRoomChance; i++)
+                        {
+                            int number = UnityEngine.Random.Range(0, 100);
+                            ints.Add(number);
+                        }
+                        int numberToPreserve = UnityEngine.Random.Range(0, 100);
+                        foreach (int i in ints)
+                        {
+                            if (i == numberToPreserve)
+                            {
+                                preserveRoom = true;
+                            }
+                        }
+                    }
+
+                    if (!preserveRoom)
+                    {
+                        roomsToRemove.Add(room);
+                        newRooms.Add(roomA);
+                        newRooms.Add(roomB);
+                        keepDividing = true;
+                    }
+                    else 
+                    {
+                        roomsPreserved.Add(room);
+                        roomsToRemove.Add(room);
+                        keepDividing = true;
+                    }
                 }
             }
             foreach (var room in roomsToRemove) roomsToDraw.Remove(room);
@@ -169,23 +365,23 @@ public class DungeonGeneratorScript : MonoBehaviour
     private void SpawnAssets() 
     {
         takenPositions.Clear();
-        SpawnDoors();
+        //SpawnDoors();
         SpawnWalls();
         SpawnFloorAndCelling();
     }
 
-    private void SpawnDoors() 
-    {
-        GameObject doorParent = new GameObject();
-        doorParent.name = "Doors";
-        Transform transform = doorParent.transform;
+    //private void SpawnDoors() 
+    //{
+    //    GameObject doorParent = new GameObject();
+    //    doorParent.name = "Doors";
+    //    Transform transform = doorParent.transform;
 
-        foreach (var door in doors) 
-        {
-            doorPrefab.transform.position = door;
-            Instantiate(doorPrefab, transform);
-        }
-    }
+    //    foreach (var door in doors) 
+    //    {
+    //        doorPrefab.transform.position = door;
+    //        Instantiate(doorPrefab, transform);
+    //    }
+    //}
 
     private void SpawnFloorAndCelling() 
     {
@@ -240,18 +436,6 @@ public class DungeonGeneratorScript : MonoBehaviour
                 wallPrefab.transform.position = spawnPosition;
                 Instantiate(wallPrefab, transform);
             }
-        }
-    }
-
-    private IEnumerator DrawRoomsCoroutine()
-    {
-        foreach (var r in roomsToDraw)
-        {
-            DebugDrawingBatcher.GetInstance().BatchCall(() =>
-            {
-                AlgorithmsUtils.DebugRectInt(r, Color.yellow);
-            });
-            yield return new WaitForSeconds(0.1f);
         }
     }
 
