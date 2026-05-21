@@ -36,6 +36,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.y
       value: 90
       objectReference: {fileID: 0}
+    - target: {fileID: 2111893259674388962, guid: 272fb9cc01e08f247b43f7e6c38dfdfb, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 2203010113207042630, guid: 272fb9cc01e08f247b43f7e6c38dfdfb, type: 3}
       propertyPath: m_LocalScale.x
       value: 50
@@ -131,6 +135,10 @@ PrefabInstance:
     - target: {fileID: 5853187014843131501, guid: 272fb9cc01e08f247b43f7e6c38dfdfb, type: 3}
       propertyPath: m_Name
       value: 7_WallCorner Variant Variant
+      objectReference: {fileID: 0}
+    - target: {fileID: 7840377204633732380, guid: 272fb9cc01e08f247b43f7e6c38dfdfb, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8003675246871711416, guid: 272fb9cc01e08f247b43f7e6c38dfdfb, type: 3}
       propertyPath: m_LocalScale.x
