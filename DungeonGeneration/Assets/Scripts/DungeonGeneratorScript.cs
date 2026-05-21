@@ -29,6 +29,7 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private GameObject EventSystem;
     [SerializeField] private int generationsBeforePreservedRooms = 3;
     [SerializeField] private int preservedRoomChance = 3;
+    [SerializeField] private int smallRoomsToRemove = 10;
     private List<RectInt> roomsPreserved = new List<RectInt>();
     private List<RectInt> roomsToDraw = new List<RectInt>();
     private List<RectInt> newRooms = new List<RectInt>();
@@ -67,6 +68,8 @@ public class DungeonGeneratorScript : MonoBehaviour
         yield return StartCoroutine(SlowDivideRooms());
 
         AddPreservedRooms();
+
+        RemoveSmallestRooms();
 
         DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
 
@@ -156,6 +159,38 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
+    private void RemoveSmallestRooms() 
+    {
+        roomsToRemove.Clear();
+        for (int i = 0; i < smallRoomsToRemove; i++) 
+        {
+            RectInt smallestRoom = roomsToDraw[0];
+            float size = smallestRoom.width * smallestRoom.height;
+            foreach (var room in roomsToDraw) 
+            {
+                float currentRoomSize = room.width * room.height;
+                if (size > currentRoomSize) 
+                {
+                    size = currentRoomSize;
+                }
+            }
+            bool removed = false;
+            foreach (var room in roomsToDraw) 
+            {
+                float currentRoomSize = room.width * room.height;
+                if (!removed && size == currentRoomSize) 
+                {
+                    roomsToRemove.Add(room);
+                    removed = true;
+                }
+            }
+            foreach (var room in roomsToRemove) 
+            {
+                roomsToDraw.Remove(room);
+            }
+        }
+    }
+
     private IEnumerator SlowSpawnAssets()
     {
         takenPositions.Clear();
@@ -172,15 +207,19 @@ public class DungeonGeneratorScript : MonoBehaviour
         GameObject CellingParent = new GameObject();
         CellingParent.name = "Celling";
         Transform cellingTransform = CellingParent.transform;
-
-        for (int i = 0; i < startRoomParams.width; i++)
+        //RectInt smth = new RectInt(0, 0, 0, 0); ;
+        foreach (var room in roomsToDraw)
         {
-            for (int j = 0; j < startRoomParams.height; j++)
+            DebugDrawingBatcher.GetInstance().BatchCall(() =>
             {
-                if (!takenPositions.Contains(new Vector3(i, 0.5f, j)))
+                AlgorithmsUtils.DebugRectInt(room, Color.green);
+            });
+            for (int i = 0; i < room.height; i++)
+            {
+                for (int j = 0; j < room.width; j++)
                 {
-                    floorPrefab.transform.position = new Vector3(i, 0f, j);
-                    cellingPrefab.transform.position = new Vector3(i, wallHeight, j);
+                    floorPrefab.transform.position = new Vector3(room.xMin + j, 0f, room.yMin + i);
+                    cellingPrefab.transform.position = new Vector3(room.xMin + j, wallHeight, room.yMin + i);
 
                     Instantiate(floorPrefab, floorTransform);
                     Instantiate(cellingPrefab, cellingTransform);
@@ -195,6 +234,15 @@ public class DungeonGeneratorScript : MonoBehaviour
         GameObject wallsParent = new GameObject();
         wallsParent.name = "Walls";
         Transform transform = wallsParent.transform;
+
+        foreach (var room in roomsToRemove)
+        {
+            DebugDrawingBatcher.GetInstance().BatchCall(() =>
+            {
+                AlgorithmsUtils.DebugRectInt(room, Color.red);
+            });
+        }
+
         foreach (var r in roomsToDraw)
         {
             for (int i = 0; i <= r.width; i++)
@@ -231,6 +279,8 @@ public class DungeonGeneratorScript : MonoBehaviour
         DivideRooms();
 
         AddPreservedRooms();
+
+        RemoveSmallestRooms();
 
         DrawRooms();
 
@@ -393,14 +443,14 @@ public class DungeonGeneratorScript : MonoBehaviour
         CellingParent.name = "Celling";
         Transform cellingTransform = CellingParent.transform;
 
-        for (int i = 0; i < startRoomParams.width; i++) 
+        foreach (var room in roomsToDraw) 
         {
-            for (int j = 0; j < startRoomParams.height; j++)
+            for (int i = 0; i < room.height; i++) 
             {
-                if (!takenPositions.Contains(new Vector3(i, 0.5f, j))) 
+                for (int j = 0; j < room.width; j++) 
                 {
-                    floorPrefab.transform.position = new Vector3(i, 0f, j);
-                    cellingPrefab.transform.position = new Vector3(i, wallHeight, j);
+                    floorPrefab.transform.position = new Vector3(room.xMin + j, 0f, room.yMin + i);
+                    cellingPrefab.transform.position = new Vector3(room.xMin + j, wallHeight, room.yMin + i);
 
                     Instantiate(floorPrefab, floorTransform);
                     Instantiate(cellingPrefab, cellingTransform);
@@ -414,6 +464,15 @@ public class DungeonGeneratorScript : MonoBehaviour
         GameObject wallsParent = new GameObject();
         wallsParent.name = "Walls";
         Transform transform = wallsParent.transform;
+
+        foreach (var room in roomsToRemove) 
+        {
+            DebugDrawingBatcher.GetInstance().BatchCall(() =>
+            {
+                AlgorithmsUtils.DebugRectInt(room, Color.red);
+            });
+        }
+
         foreach (var r in roomsToDraw)
         {
             for (int i = 0; i <= r.width; i++)

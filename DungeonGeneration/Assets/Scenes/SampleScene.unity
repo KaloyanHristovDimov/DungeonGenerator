@@ -371,6 +371,7 @@ MonoBehaviour:
   EventSystem: {fileID: 2544084172373283389, guid: c3555ab6a3fc52845beb0ffe5057582b, type: 3}
   generationsBeforePreservedRooms: 3
   preservedRoomChance: 3
+  smallRoomsToRemove: 10
 --- !u!4 &1411615435
 Transform:
   m_ObjectHideFlags: 0
