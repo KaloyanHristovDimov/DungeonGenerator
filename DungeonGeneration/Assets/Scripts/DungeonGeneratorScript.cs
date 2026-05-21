@@ -39,6 +39,7 @@ public class DungeonGeneratorScript : MonoBehaviour
     private bool keepDividing = true;
     private List<Vector3> takenPositions = new List<Vector3>();
     private List<Vector3> doors = new List<Vector3>();
+    private List<Vector3> floorPositions = new List<Vector3>();
     private struct Vector3Line
     {
         public Vector3 start;
@@ -448,8 +449,11 @@ public class DungeonGeneratorScript : MonoBehaviour
             {
                 for (int j = 0; j < room.width; j++) 
                 {
-                    floorPrefab.transform.position = new Vector3(room.xMin + j, 0f, room.yMin + i);
-                    cellingPrefab.transform.position = new Vector3(room.xMin + j, wallHeight, room.yMin + i);
+                    Vector3 position = new Vector3(room.xMin + j, 0f, room.yMin + i);
+                    floorPrefab.transform.position = new Vector3(position.x, 0f, position.z);
+                    cellingPrefab.transform.position = new Vector3(position.x, wallHeight, position.z);
+
+                    floorPositions.Add(position);
 
                     Instantiate(floorPrefab, floorTransform);
                     Instantiate(cellingPrefab, cellingTransform);
@@ -622,7 +626,9 @@ public class DungeonGeneratorScript : MonoBehaviour
         GameObject navmesh = Instantiate(navMesh);
         navMeshSurface = navmesh.GetComponent<NavMeshSurface>();
         navMeshSurface.BuildNavMesh();
+        int playerPosition = UnityEngine.Random.Range(0, (floorPositions.Count-1));
         GameObject player = Instantiate(playerPrefab);
+        player.transform.position = floorPositions[playerPosition];
         GameObject camera = Instantiate(cameraPrefab);
         player.AddComponent<PlayerController>();
         NavMeshAgent navMeshAgent = player.GetComponent<NavMeshAgent>();
