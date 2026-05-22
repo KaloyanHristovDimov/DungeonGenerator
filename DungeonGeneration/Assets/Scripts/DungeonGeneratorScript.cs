@@ -85,12 +85,12 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         yield return StartCoroutine(SlowRemoveSmallestRooms());
 
-        DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
-
-        FindIntersections();
+        yield return StartCoroutine(SlowFindIntersections());
 
         yield return StartCoroutine(SlowSpawnAssets());
 
+        DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
+        
         SpawnNavMeshAndPlayer();
     }
 
@@ -436,6 +436,61 @@ public class DungeonGeneratorScript : MonoBehaviour
             }
         }
         DecideDoors();
+    }
+
+    private IEnumerator SlowFindIntersections()
+    {
+        vector3Lines.Clear();
+        for (int i = 0; i < roomsToDraw.Count; i++)
+        {
+            for (int j = i + 1; j < roomsToDraw.Count; j++)
+            {
+                RectInt roomA = roomsToDraw[i];
+                RectInt roomB = roomsToDraw[j];
+                if (roomB != roomA)
+                {
+                    RectInt intersection = AlgorithmsUtils.Intersect(roomB, roomA);
+                    if (intersection.width == 0 && intersection.height > 1)
+                    {
+                        Vector3 start = new Vector3(intersection.x, 0.5f, intersection.y + 1);
+                        Vector3 end = new Vector3(intersection.x, 0.5f, intersection.yMax - 1);
+                        Vector3Line intersectionLine = new Vector3Line(start, end);
+                        vector3Lines.Add(intersectionLine);
+                    }
+                    else if (intersection.width > 1 && intersection.height == 0)
+                    {
+                        Vector3 start = new Vector3(intersection.x + 1, 0.5f, intersection.y);
+                        Vector3 end = new Vector3(intersection.xMax - 1, 0.5f, intersection.y);
+                        Vector3Line intersectionLine = new Vector3Line(start, end);
+                        vector3Lines.Add(intersectionLine);
+                    }
+
+                }
+            }
+        }
+        yield return StartCoroutine(SlowDecideDoors());
+    }
+
+    private IEnumerator SlowDecideDoors() 
+    {
+        doors.Clear();
+        foreach (var line in vector3Lines)
+        {
+            Vector3 doorPosition = Vector3.Lerp(line.start, line.end, UnityEngine.Random.value);
+            Vector3 mat = line.start - line.end;
+            doorPosition.x = Mathf.Round(doorPosition.x);
+            doorPosition.y = 0.5f;
+            doorPosition.z = Mathf.Round(doorPosition.z);
+
+            doors.Add(doorPosition);
+
+            RectInt doorSquare = new RectInt((int)doorPosition.x - 1, (int)doorPosition.z - 1, 1, 1);
+            DebugDrawingBatcher.GetInstance().BatchCall(() =>
+            {
+                AlgorithmsUtils.DebugRectInt(doorSquare, Color.cyan);
+            });
+            yield return new WaitForSeconds(0.2f);
+        }
     }
 
     private void DecideDoors() 
