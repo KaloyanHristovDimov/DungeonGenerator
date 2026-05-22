@@ -1,6 +1,7 @@
 using NaughtyAttributes;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.AI.Navigation;
 using UnityEditor.Rendering;
 using UnityEngine;
@@ -81,6 +82,8 @@ public class DungeonGeneratorScript : MonoBehaviour
     [Button]
     private void GenerateDungeon()
     {
+        graph = new Vector3Graph();
+
         DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
         
         AddBaseRoom();
@@ -237,33 +240,87 @@ public class DungeonGeneratorScript : MonoBehaviour
     {
         roomsToRemove.Clear();
         int smallRoomsToRemove = (int)(finalRooms.Count / 10);
+        Debug.Log($"Rooms to remove: {smallRoomsToRemove}");
+        int removedRooms = 0;
+        List<RectInt> roomPool = new List<RectInt>(finalRooms);
         for (int i = 0; i < smallRoomsToRemove; i++)
         {
-            RectInt smallestRoom = finalRooms[0];
-            float size = smallestRoom.width * smallestRoom.height;
-            foreach (var room in finalRooms)
-            {
-                float currentRoomSize = room.width * room.height;
-                if (size > currentRoomSize)
-                {
-                    size = currentRoomSize;
-                }
-            }
+            RectInt smallestRoom;
+            float size;
             bool removed = false;
-            foreach (var room in finalRooms)
+            while (!removed && roomPool.Count() > 0) 
             {
-                float currentRoomSize = room.width * room.height;
-                if (!removed && size == currentRoomSize)
+                smallestRoom = roomPool[0];
+                size = smallestRoom.width * smallestRoom.height;
+
+                foreach (var room in roomPool) 
                 {
-                    roomsToRemove.Add(room);
-                    removed = true;
+                    float currentRoomSize = room.width * room.height;
+                    if (size > currentRoomSize)
+                        size = currentRoomSize;
                 }
-            }
-            foreach (var room in roomsToRemove)
-            {
-                finalRooms.Remove(room);
+
+                foreach (var room in roomPool)
+                {
+                    float currentRoomSize = room.width * room.height;
+                    if (!removed && size == currentRoomSize)
+                    {
+                        if (CanRemove(room))
+                        {
+                            roomsToRemove.Add(room);
+                            roomPool.Remove(room);
+                            removed = true;
+                        }
+                        else 
+                            roomPool.Remove(room);
+                        
+                        break;
+                    }
+                }
             }
         }
+        foreach (var room in roomsToRemove)
+        {
+            finalRooms.Remove(room);
+            removedRooms++;
+        }
+
+        Debug.Log($"Rooms removed: {removedRooms}");
+    }
+
+    private bool CanRemove(RectInt room) 
+    {
+        List<RectInt> remainingRooms = new List<RectInt>(finalRooms);
+        remainingRooms.Remove(room);
+
+        HashSet<RectInt> visitedRooms = new HashSet<RectInt>();
+        Queue<RectInt> roomsToCheck = new Queue<RectInt>();
+
+        RectInt startRoom = remainingRooms[0];
+
+        visitedRooms.Add(startRoom);
+        roomsToCheck.Enqueue(startRoom);
+
+        while (roomsToCheck.Count > 0)
+        {
+            RectInt currentRoom = roomsToCheck.Dequeue();
+
+            foreach (RectInt otherRoom in remainingRooms)
+            {
+                if (visitedRooms.Contains(otherRoom))
+                    continue;
+
+                RectInt intersection = AlgorithmsUtils.Intersect(currentRoom, otherRoom);
+
+                if (intersection.height > 1 || intersection.width > 1)
+                {
+                    visitedRooms.Add(otherRoom);
+                    roomsToCheck.Enqueue(otherRoom);
+                }
+            }
+        }
+
+        return visitedRooms.Count == remainingRooms.Count;
     }
 
     private void FindIntersections()
@@ -488,6 +545,7 @@ public class DungeonGeneratorScript : MonoBehaviour
     [Button]
     private IEnumerator SlowGenerateDungeon() 
     {
+        graph = new Vector3Graph();
         DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
 
         AddBaseRoom();
@@ -502,8 +560,6 @@ public class DungeonGeneratorScript : MonoBehaviour
         yield return StartCoroutine(SlowFindIntersections());
         yield return StartCoroutine(graph.SlowPrintGraph());
         yield return StartCoroutine(SlowSpawnAssets());
-
-        DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
         
         SpawnGameplayObjects();
     }
@@ -557,39 +613,64 @@ public class DungeonGeneratorScript : MonoBehaviour
     private IEnumerator SlowRemoveSmallestRooms()
     {
         roomsToRemove.Clear();
+
         int smallRoomsToRemove = (int)(finalRooms.Count / 10);
+        List<RectInt> roomPool = new List<RectInt>(finalRooms);
+
+        Debug.Log($"Rooms to remove: {smallRoomsToRemove}");
+        int removedRooms = 0;
+
+        RectInt smallestRoom;
+        float size;
+        
+
         for (int i = 0; i < smallRoomsToRemove; i++)
         {
-            RectInt smallestRoom = finalRooms[0];
-            float size = smallestRoom.width * smallestRoom.height;
-            foreach (var room in finalRooms)
-            {
-                float currentRoomSize = room.width * room.height;
-                if (size > currentRoomSize)
-                {
-                    size = currentRoomSize;
-                }
-            }
             bool removed = false;
-            foreach (var room in finalRooms)
+            while (!removed && roomPool.Count() > 0) 
             {
-                float currentRoomSize = room.width * room.height;
-                if (!removed && size == currentRoomSize)
+                smallestRoom = roomPool[0];
+                size = smallestRoom.width * smallestRoom.height;
+
+                foreach (var room in roomPool)
                 {
-                    DebugDrawingBatcher.GetInstance().BatchCall(() =>
-                    {
-                        AlgorithmsUtils.DebugRectInt(room, Color.red);
-                    });
-                    roomsToRemove.Add(room);
-                    removed = true;
-                    yield return new WaitForSeconds(0.5f);
+                    float currentRoomSize = room.width * room.height;
+                    if (size > currentRoomSize)
+                        size = currentRoomSize;
                 }
-            }
-            foreach (var room in roomsToRemove)
-            {
-                finalRooms.Remove(room);
+
+                foreach (var room in roomPool)
+                {
+                    float currentRoomSize = room.width * room.height;
+                    if (!removed && size == currentRoomSize)
+                    {
+                        if (CanRemove(room))
+                        {
+                            DebugDrawingBatcher.GetInstance().BatchCall(() =>
+                            {
+                                AlgorithmsUtils.DebugRectInt(room, Color.red);
+                            });
+                            roomsToRemove.Add(room);
+                            roomPool.Remove(room);
+                            removed = true;
+                            yield return new WaitForSeconds(0.5f);
+                        }
+                        else 
+                        {
+                            roomPool.Remove(room);
+                        } 
+
+                        break;
+                    }
+                }
             }
         }
+        foreach (var room in roomsToRemove)
+        {
+            finalRooms.Remove(room);
+            removedRooms++;
+        }
+        Debug.Log($"Rooms removed: {removedRooms}");
     }
 
     private IEnumerator SlowFindIntersections()
