@@ -71,7 +71,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         AddPreservedRooms();
 
-        SlowRemoveSmallestRooms();
+        yield return StartCoroutine(SlowRemoveSmallestRooms());
 
         DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
 
@@ -256,13 +256,16 @@ public class DungeonGeneratorScript : MonoBehaviour
                 for (int j = 0; j < room.width; j++)
                 {
                     Vector3 position = new Vector3(room.xMin + j, 0f, room.yMin + i);
-                    floorPrefab.transform.position = new Vector3(position.x, 0f, position.z);
-                    cellingPrefab.transform.position = new Vector3(position.x, wallHeight, position.z);
+                    if (position.x != 0 && position.z != 0) 
+                    {
+                        floorPrefab.transform.position = new Vector3(position.x, 0f, position.z);
+                        cellingPrefab.transform.position = new Vector3(position.x, wallHeight, position.z);
 
-                    floorPositions.Add(position);
+                        floorPositions.Add(position);
 
-                    Instantiate(floorPrefab, floorTransform);
-                    Instantiate(cellingPrefab, cellingTransform);
+                        Instantiate(floorPrefab, floorTransform);
+                        Instantiate(cellingPrefab, cellingTransform);
+                    }
                 }
             }
             yield return new WaitForSeconds(0.1f);
@@ -477,13 +480,16 @@ public class DungeonGeneratorScript : MonoBehaviour
                 for (int j = 0; j < room.width; j++) 
                 {
                     Vector3 position = new Vector3(room.xMin + j, 0f, room.yMin + i);
-                    floorPrefab.transform.position = new Vector3(position.x, 0f, position.z);
-                    cellingPrefab.transform.position = new Vector3(position.x, wallHeight, position.z);
+                    if (position.x != 0 && position.z != 0) 
+                    {
+                        floorPrefab.transform.position = new Vector3(position.x, 0f, position.z);
+                        cellingPrefab.transform.position = new Vector3(position.x, wallHeight, position.z);
 
-                    floorPositions.Add(position);
+                        floorPositions.Add(position);
 
-                    Instantiate(floorPrefab, floorTransform);
-                    Instantiate(cellingPrefab, cellingTransform);
+                        Instantiate(floorPrefab, floorTransform);
+                        Instantiate(cellingPrefab, cellingTransform);
+                    }
                 }
             }
         }
