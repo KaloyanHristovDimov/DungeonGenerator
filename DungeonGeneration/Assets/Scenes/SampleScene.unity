@@ -357,7 +357,7 @@ MonoBehaviour:
     y: 0
     width: 100
     height: 100
-  wait: 0
+  wait: 1
   randomSizeMin: 0.05
   randomSizeMax: 0.75
   wallHeight: 2
@@ -378,7 +378,6 @@ MonoBehaviour:
   - {fileID: 1040310750116940119, guid: 988bdb5b8c8e5684f82e8aa72c31960a, type: 3}
   - {fileID: 2891759284571720867, guid: ef501ae38d35df8469fa26679054f194, type: 3}
   - {fileID: 4007745676147069824, guid: a4a5f9249e7746144a150e6b590e3c0f, type: 3}
-  wallPrefab: {fileID: 2218717143617821881, guid: 614eab2f721ec9c4892df631195bd8ca, type: 3}
   floorPrefab: {fileID: 9000173560118708085, guid: eed0e49390e44ce429d1b1da405124e5, type: 3}
   cellingPrefab: {fileID: 4007745676147069824, guid: a4a5f9249e7746144a150e6b590e3c0f, type: 3}
   playerPrefab: {fileID: 6960273550685390306, guid: 8721630e217012a408afb4ae80e1fe4b, type: 3}

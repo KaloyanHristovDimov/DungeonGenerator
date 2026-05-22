@@ -21,7 +21,6 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private float randomSizeMax = 0.75f;
     [SerializeField] private int wallHeight = 2;
     [SerializeField] private List<GameObject> wallPrefabs;
-    [SerializeField] private GameObject wallPrefab;
     [SerializeField] private GameObject floorPrefab;
     [SerializeField] private GameObject cellingPrefab;
     //[SerializeField] private GameObject doorPrefab;
@@ -72,7 +71,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         AddPreservedRooms();
 
-        RemoveSmallestRooms();
+        SlowRemoveSmallestRooms();
 
         DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
 
@@ -162,6 +161,44 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
+    private IEnumerator SlowRemoveSmallestRooms()
+    {
+        roomsToRemove.Clear();
+        int smallRoomsToRemove = (int)(roomsToDraw.Count / 10);
+        for (int i = 0; i < smallRoomsToRemove; i++)
+        {
+            RectInt smallestRoom = roomsToDraw[0];
+            float size = smallestRoom.width * smallestRoom.height;
+            foreach (var room in roomsToDraw)
+            {
+                float currentRoomSize = room.width * room.height;
+                if (size > currentRoomSize)
+                {
+                    size = currentRoomSize;
+                }
+            }
+            bool removed = false;
+            foreach (var room in roomsToDraw)
+            {
+                float currentRoomSize = room.width * room.height;
+                if (!removed && size == currentRoomSize)
+                {
+                    DebugDrawingBatcher.GetInstance().BatchCall(() =>
+                    {
+                        AlgorithmsUtils.DebugRectInt(room, Color.red);
+                    });
+                    roomsToRemove.Add(room);
+                    removed = true;
+                    yield return new WaitForSeconds(0.5f);
+                }
+            }
+            foreach (var room in roomsToRemove)
+            {
+                roomsToDraw.Remove(room);
+            }
+        }
+    }
+
     private void RemoveSmallestRooms() 
     {
         roomsToRemove.Clear();
@@ -218,53 +255,43 @@ public class DungeonGeneratorScript : MonoBehaviour
             {
                 for (int j = 0; j < room.width; j++)
                 {
-                    floorPrefab.transform.position = new Vector3(room.xMin + j, 0f, room.yMin + i);
-                    cellingPrefab.transform.position = new Vector3(room.xMin + j, wallHeight, room.yMin + i);
+                    Vector3 position = new Vector3(room.xMin + j, 0f, room.yMin + i);
+                    floorPrefab.transform.position = new Vector3(position.x, 0f, position.z);
+                    cellingPrefab.transform.position = new Vector3(position.x, wallHeight, position.z);
+
+                    floorPositions.Add(position);
 
                     Instantiate(floorPrefab, floorTransform);
                     Instantiate(cellingPrefab, cellingTransform);
-                    yield return new WaitForSeconds(0.001f);
                 }
             }
+            yield return new WaitForSeconds(0.1f);
         }
     }
 
     private IEnumerator SlowSpawnWalls()
     {
-        GameObject wallsParent = new GameObject();
-        wallsParent.name = "Walls";
-        Transform transform = wallsParent.transform;
+        SetTakenPositions();
+        int[,] tileMap = GenerateTileMap();
+        int rows = tileMap.GetLength(0);
+        int cols = tileMap.GetLength(1);
+        GameObject wallsParent = new GameObject("Walls");
 
-        foreach (var room in roomsToRemove)
+        for (int i = 0; i <= rows - 2; i++)
         {
-            DebugDrawingBatcher.GetInstance().BatchCall(() =>
+            for (int j = 0; j <= cols - 2; j++)
             {
-                AlgorithmsUtils.DebugRectInt(room, Color.red);
-            });
-        }
-
-        foreach (var r in roomsToDraw)
-        {
-            for (int i = 0; i <= r.width; i++)
-            {
-                for (int j = 0; j <= r.height; j++)
+                int prefabNumber = (tileMap[i, j] * (int)Math.Pow(2, 0))
+                    + (tileMap[i, j + 1] * (int)Math.Pow(2, 1))
+                    + (tileMap[i + 1, j + 1] * (int)Math.Pow(2, 2))
+                    + (tileMap[i + 1, j] * (int)Math.Pow(2, 3));
+                if (prefabNumber != 0)
                 {
-                    if ((i == 0 || i == r.width || j == 0 || j == r.height) && !doors.Contains(new Vector3(r.xMin + i, 0.5f, r.yMin + j)))
-                    {
-                        takenPositions.Add(new Vector3(r.xMin + i, 0.5f, r.yMin + j));
-                    }
+                    GameObject wallToInstantiate = wallPrefabs[prefabNumber];
+                    wallToInstantiate.transform.position = new Vector3(i + 1f, 0f, j + 1f);
+                    Instantiate(wallToInstantiate, wallsParent.transform);
+                    yield return new WaitForSeconds(0.001f);
                 }
-            }
-        }
-        for (int i = 0; i < wallHeight; i++)
-        {
-            foreach (var position in takenPositions)
-            {
-                Vector3 spawnPosition = position;
-                spawnPosition.y = i + 0.5f;
-                wallPrefab.transform.position = spawnPosition;
-                Instantiate(wallPrefab, transform);
-                yield return new WaitForSeconds(0.001f);
             }
         }
     }
@@ -461,37 +488,6 @@ public class DungeonGeneratorScript : MonoBehaviour
             }
         }
     }
-
-    //private void SpawnWalls() 
-    //{
-    //    GameObject wallsParent = new GameObject();
-    //    wallsParent.name = "Walls";
-    //    Transform transform = wallsParent.transform;
-
-    //    foreach (var r in roomsToDraw)
-    //    {
-    //        for (int i = 0; i <= r.width; i++)
-    //        {
-    //            for (int j = 0; j <= r.height; j++)
-    //            {
-    //                if ((i == 0 || i == r.width || j == 0 || j == r.height) && !doors.Contains(new Vector3 (r.xMin + i, 0.5f, r.yMin + j)))
-    //                {
-    //                    takenPositions.Add(new Vector3(r.xMin + i, 0.5f, r.yMin + j));
-    //                }
-    //            }
-    //        }
-    //    }
-    //    for (int i = 0; i < wallHeight; i++) 
-    //    {
-    //        foreach (var position in takenPositions)
-    //        {
-    //            Vector3 spawnPosition = position;
-    //            spawnPosition.y = i + 0.5f;
-    //            wallPrefab.transform.position = spawnPosition;
-    //            Instantiate(wallPrefab, transform);
-    //        }
-    //    }
-    //}
 
     private void SetTakenPositions() 
     {
