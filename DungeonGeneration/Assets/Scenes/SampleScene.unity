@@ -357,10 +357,16 @@ MonoBehaviour:
     y: 0
     width: 100
     height: 100
-  wait: 1
   randomSizeMin: 0.05
   randomSizeMax: 0.75
-  wallHeight: 2
+  generationsBeforePreservedRooms: 10
+  preservedRoomChance: 10
+  floorPrefab: {fileID: 9000173560118708085, guid: eed0e49390e44ce429d1b1da405124e5, type: 3}
+  playerPrefab: {fileID: 6960273550685390306, guid: 8721630e217012a408afb4ae80e1fe4b, type: 3}
+  cameraPrefab: {fileID: 7411540820675689905, guid: 8d830e71ed0eff04ba14dd73dfe88a64, type: 3}
+  navMesh: {fileID: 401706191864126830, guid: 0dca86ec291cb0842a672d405aedff4a, type: 3}
+  uiPrefab: {fileID: 2699573833096480216, guid: 0eb33d885e1a0cf429caa01c72c58cf4, type: 3}
+  eventSystem: {fileID: 2544084172373283389, guid: c3555ab6a3fc52845beb0ffe5057582b, type: 3}
   wallPrefabs:
   - {fileID: 4007745676147069824, guid: a4a5f9249e7746144a150e6b590e3c0f, type: 3}
   - {fileID: 4038827269175978573, guid: 8c9cc736ad3c4ab4087aade106396a5d, type: 3}
@@ -378,15 +384,9 @@ MonoBehaviour:
   - {fileID: 1040310750116940119, guid: 988bdb5b8c8e5684f82e8aa72c31960a, type: 3}
   - {fileID: 2891759284571720867, guid: ef501ae38d35df8469fa26679054f194, type: 3}
   - {fileID: 4007745676147069824, guid: a4a5f9249e7746144a150e6b590e3c0f, type: 3}
-  floorPrefab: {fileID: 9000173560118708085, guid: eed0e49390e44ce429d1b1da405124e5, type: 3}
-  cellingPrefab: {fileID: 4007745676147069824, guid: a4a5f9249e7746144a150e6b590e3c0f, type: 3}
-  playerPrefab: {fileID: 6960273550685390306, guid: 8721630e217012a408afb4ae80e1fe4b, type: 3}
-  cameraPrefab: {fileID: 7411540820675689905, guid: 8d830e71ed0eff04ba14dd73dfe88a64, type: 3}
-  navMesh: {fileID: 401706191864126830, guid: 0dca86ec291cb0842a672d405aedff4a, type: 3}
-  UIPrefab: {fileID: 2699573833096480216, guid: 0eb33d885e1a0cf429caa01c72c58cf4, type: 3}
-  EventSystem: {fileID: 2544084172373283389, guid: c3555ab6a3fc52845beb0ffe5057582b, type: 3}
-  generationsBeforePreservedRooms: 10
-  preservedRoomChance: 10
+  wait: 0
+  useRandomSeed: 1
+  seed: 1
 --- !u!4 &1411615435
 Transform:
   m_ObjectHideFlags: 0
