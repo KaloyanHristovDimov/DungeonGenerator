@@ -328,12 +328,13 @@ public class DungeonGeneratorScript : MonoBehaviour
         {
             Vector3 doorPosition = Vector3.Lerp(line.start, line.end, UnityEngine.Random.value);
             doorPosition.x = Mathf.Round(doorPosition.x);
-            doorPosition.y = 0f;
+            doorPosition.y = 0.5f;
             doorPosition.z = Mathf.Round(doorPosition.z);
 
             doors.Add(doorPosition);
 
             doorPosition.x -= 0.5f;
+            doorPosition.y -= 0.5f;
             doorPosition.z -= 0.5f;
 
             graph.AddEdge(line.roomA, doorPosition);
