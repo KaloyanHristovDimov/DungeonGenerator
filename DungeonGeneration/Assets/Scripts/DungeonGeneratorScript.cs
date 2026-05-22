@@ -31,6 +31,8 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private GameObject EventSystem;
     [SerializeField] private int generationsBeforePreservedRooms = 10;
     [SerializeField] private int preservedRoomChance = 10;
+    [SerializeField] private bool useRandomSeed = false;
+    [SerializeField] private int seed = 0;
     private List<RectInt> roomsPreserved = new List<RectInt>();
     private List<RectInt> roomsToDraw = new List<RectInt>();
     private List<RectInt> newRooms = new List<RectInt>();
@@ -55,10 +57,20 @@ public class DungeonGeneratorScript : MonoBehaviour
 
     void Start()
     {
+        SeedPick();
         if (wait)
             StartCoroutine(SlowGenerateDungeon());
         else
             GenerateDungeon();
+    }
+
+    private void SeedPick() 
+    {
+        if (useRandomSeed) 
+        {
+            seed = UnityEngine.Random.Range(int.MinValue, int.MaxValue);
+        }
+        UnityEngine.Random.InitState(seed);
     }
 
     private IEnumerator SlowGenerateDungeon() 
