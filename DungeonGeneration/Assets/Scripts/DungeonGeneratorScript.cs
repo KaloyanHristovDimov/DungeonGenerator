@@ -2,6 +2,7 @@ using NaughtyAttributes;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.AI.Navigation;
+using UnityEditor.Rendering;
 using UnityEngine;
 
 public class DungeonGeneratorScript : MonoBehaviour
@@ -28,6 +29,8 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private bool useRandomSeed = true;
     [SerializeField] private int seed = 1;
 
+    private Vector3Graph graph;
+
     private List<RectInt> roomsPreserved = new List<RectInt>();
     private List<RectInt> finalRooms = new List<RectInt>();
     private List<RectInt> newRooms = new List<RectInt>();
@@ -43,16 +46,22 @@ public class DungeonGeneratorScript : MonoBehaviour
         public Vector3 start;
         public Vector3 end;
 
-        public Vector3Line(Vector3 start, Vector3 end)
+        public Vector3 roomA;
+        public Vector3 roomB;
+
+        public Vector3Line(Vector3 start, Vector3 end, Vector3 roomA, Vector3 roomB)
         {
             this.start = start;
             this.end = end;
+            this.roomA = roomA;
+            this.roomB = roomB;
         }
     }
 
     void Start()
     {
         SeedPick();
+        graph = new Vector3Graph();
         if (wait)
             StartCoroutine(SlowGenerateDungeon());
         else
@@ -84,6 +93,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         //Doors depend on intersections, and walls depend on doors.
         FindIntersections();
+        graph.PrintGraph();
         SpawnAssets();
 
         SpawnGameplayObjects();
@@ -268,28 +278,32 @@ public class DungeonGeneratorScript : MonoBehaviour
                 if (roomB != roomA)
                 {
                     RectInt intersection = AlgorithmsUtils.Intersect(roomB, roomA);
-                    AddSharedWallLine(intersection);
+
+                    Vector3 roomAPosition = new Vector3(roomA.center.x, 0f, roomA.center.y);
+                    Vector3 roomBPosition = new Vector3(roomB.center.x, 0f, roomB.center.y);
+
+                    AddSharedWallLine(intersection, roomAPosition, roomBPosition);
                 }
             }
         }
         DecideDoors();
     }
 
-    private void AddSharedWallLine(RectInt intersection)
+    private void AddSharedWallLine(RectInt intersection, Vector3 roomA, Vector3 roomB)
     {
         if (IsVerticalIntersection(intersection))
         {
             Vector3 start = new Vector3(intersection.x, 0.5f, intersection.y + 1);
             Vector3 end = new Vector3(intersection.x, 0.5f, intersection.yMax - 1);
 
-            sharedWallLines.Add(new Vector3Line(start, end));
+            sharedWallLines.Add(new Vector3Line(start, end, roomA, roomB));
         }
         else if (IsHorizontalIntersection(intersection))
         {
             Vector3 start = new Vector3(intersection.x + 1, 0.5f, intersection.y);
             Vector3 end = new Vector3(intersection.xMax - 1, 0.5f, intersection.y);
 
-            sharedWallLines.Add(new Vector3Line(start, end));
+            sharedWallLines.Add(new Vector3Line(start, end, roomA, roomB));
         }
     }
 
@@ -314,10 +328,16 @@ public class DungeonGeneratorScript : MonoBehaviour
         {
             Vector3 doorPosition = Vector3.Lerp(line.start, line.end, UnityEngine.Random.value);
             doorPosition.x = Mathf.Round(doorPosition.x);
-            doorPosition.y = 0.5f;
+            doorPosition.y = 0f;
             doorPosition.z = Mathf.Round(doorPosition.z);
 
             doors.Add(doorPosition);
+
+            doorPosition.x -= 0.5f;
+            doorPosition.z -= 0.5f;
+
+            graph.AddEdge(line.roomA, doorPosition);
+            graph.AddEdge(doorPosition, line.roomB);
         }
     }
 
@@ -479,6 +499,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         //Doors depend on intersections, and walls depend on doors.
         yield return StartCoroutine(SlowFindIntersections());
+        yield return StartCoroutine(graph.SlowPrintGraph());
         yield return StartCoroutine(SlowSpawnAssets());
 
         DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
@@ -582,7 +603,11 @@ public class DungeonGeneratorScript : MonoBehaviour
                 if (roomB != roomA)
                 {
                     RectInt intersection = AlgorithmsUtils.Intersect(roomB, roomA);
-                    AddSharedWallLine(intersection);
+
+                    Vector3 roomAPosition = new Vector3(roomA.center.x, 0f, roomA.center.y);
+                    Vector3 roomBPosition = new Vector3(roomB.center.x, 0f, roomB.center.y);
+
+                    AddSharedWallLine(intersection, roomAPosition, roomBPosition);
                 }
             }
         }
@@ -607,6 +632,12 @@ public class DungeonGeneratorScript : MonoBehaviour
                 AlgorithmsUtils.DebugRectInt(doorSquare, Color.cyan);
             });
             yield return new WaitForSeconds(0.02f);
+
+            doorPosition.x -= 0.5f;
+            doorPosition.z -= 0.5f;
+
+            graph.AddEdge(line.roomA, doorPosition);
+            graph.AddEdge(doorPosition, line.roomB);
         }
     }
 
