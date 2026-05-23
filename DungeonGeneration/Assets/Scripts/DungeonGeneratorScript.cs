@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.AI.Navigation;
+using UnityEditor.Overlays;
 using UnityEditor.Rendering;
 using UnityEngine;
 
@@ -96,6 +97,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         //Doors depend on intersections, and walls depend on doors.
         FindIntersections();
+        RemoveExtraDoors();
         graph.PrintGraph();
         SpawnAssets();
 
@@ -383,10 +385,18 @@ public class DungeonGeneratorScript : MonoBehaviour
         doors.Clear();
         foreach (var line in sharedWallLines) 
         {
-            Vector3 doorPosition = Vector3.Lerp(line.start, line.end, UnityEngine.Random.value);
-            doorPosition.x = Mathf.Round(doorPosition.x);
-            doorPosition.y = 0.5f;
-            doorPosition.z = Mathf.Round(doorPosition.z);
+            bool isAtEdge = true;
+            Vector3 doorPosition = new Vector3();
+            while (isAtEdge) 
+            {
+                doorPosition = Vector3.Lerp(line.start, line.end, UnityEngine.Random.value);
+                doorPosition.x = Mathf.Round(doorPosition.x);
+                doorPosition.y = 0.5f;
+                doorPosition.z = Mathf.Round(doorPosition.z);
+                if(doorPosition.x > 1 && doorPosition.z > 1)
+                    isAtEdge = false;
+            }
+            
 
             doors.Add(doorPosition);
 
@@ -396,6 +406,51 @@ public class DungeonGeneratorScript : MonoBehaviour
 
             graph.AddEdge(line.roomA, doorPosition);
             graph.AddEdge(doorPosition, line.roomB);
+        }
+    }
+
+    private void RemoveExtraDoors() 
+    {
+        List<Vector3> roomNodes = GetRoomNodes();
+
+        List<Vector3> doorPool = new List<Vector3>(doors);
+
+        ShuffleList(doorPool);
+
+        foreach (var wallDoor in doorPool) 
+        {
+            Vector3 graphDoor = new Vector3(wallDoor.x - 0.5f, wallDoor.y - 0.5f, wallDoor.z - 0.5f);
+            if (graph.CanRemoveNodeWithoutDisconnecting(graphDoor, roomNodes))
+            {
+                graph.RemoveNode(graphDoor);
+
+                doors.Remove(wallDoor);
+            }
+        }
+    }
+
+    private List<Vector3> GetRoomNodes()
+    {
+        List<Vector3> roomNodes = new List<Vector3>();
+
+        foreach (RectInt room in finalRooms)
+        {
+            Vector3 roomPosition = new Vector3(room.center.x, 0f, room.center.y);
+            roomNodes.Add(roomPosition);
+        }
+
+        return roomNodes;
+    }
+
+    private void ShuffleList<T>(List<T> list)
+    {
+        for (int i = 0; i < list.Count; i++)
+        {
+            int randomIndex = UnityEngine.Random.Range(i, list.Count);
+
+            T temp = list[i];
+            list[i] = list[randomIndex];
+            list[randomIndex] = temp;
         }
     }
 

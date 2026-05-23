@@ -23,12 +23,68 @@ public class Vector3Graph
         if (!nodes.ContainsKey(fromNode)) nodes.Add(fromNode, new List<Vector3>());
         if (!nodes.ContainsKey(toNode)) nodes.Add(toNode, new List<Vector3>());
 
-        if (!nodes[fromNode].Contains(toNode) && !nodes[toNode].Contains(fromNode))
-        {
+        if (!nodes[fromNode].Contains(toNode))
             nodes[fromNode].Add(toNode);
+
+        if (!nodes[toNode].Contains(fromNode))
             nodes[toNode].Add(fromNode);
-        }
     }
+
+    public void RemoveNode(Vector3 node)
+    {
+        if (!nodes.ContainsKey(node))
+            return;
+
+        foreach (Vector3 neighbor in nodes[node])
+        {
+            nodes[neighbor].Remove(node);
+        }
+
+        nodes.Remove(node);
+    }
+
+    public bool CanRemoveNodeWithoutDisconnecting(Vector3 nodeToRemove, List<Vector3> requiredNodes)
+    {
+        Vector3 startNode = requiredNodes[0];
+
+        if (startNode == nodeToRemove)
+            return false;
+
+        HashSet<Vector3> visited = new HashSet<Vector3>();
+        Queue<Vector3> queue = new Queue<Vector3>();
+
+        visited.Add(startNode);
+        queue.Enqueue(startNode);
+
+        while (queue.Count > 0)
+        {
+            Vector3 currentNode = queue.Dequeue();
+
+            if (!nodes.ContainsKey(currentNode))
+                continue;
+
+            foreach (Vector3 neighbor in nodes[currentNode])
+            {
+                if (neighbor == nodeToRemove)
+                    continue;
+
+                if (visited.Contains(neighbor))
+                    continue;
+
+                visited.Add(neighbor);
+                queue.Enqueue(neighbor);
+            }
+        }
+
+        foreach (Vector3 requiredNode in requiredNodes)
+        {
+            if (!visited.Contains(requiredNode))
+                return false;
+        }
+
+        return true;
+    }
+
     public List<Vector3> ListGraph()
     {
         List<Vector3> list = new List<Vector3>();
