@@ -14,8 +14,10 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private RectInt startRoomParams = new RectInt(0, 0, 100, 100);
     [SerializeField] private float randomSizeMin = 0.05f;
     [SerializeField] private float randomSizeMax = 0.75f;
-    [SerializeField] private int generationsBeforePreservedRooms = 10;
-    [SerializeField] private int preservedRoomChance = 10;
+    [SerializeField] private int generationsBeforePreservedRooms = 5;
+    [SerializeField] private int generationsBeforeChanceToStopCutting = 5;
+    [SerializeField] private int preservedRoomChance = 20;
+    [SerializeField] private int stopSplittingChance = 15;
 
     [Header("Prefabs")]
     [SerializeField] private GameObject floorPrefab;
@@ -118,10 +120,12 @@ public class DungeonGeneratorScript : MonoBehaviour
     {
         keepDividing = true;
         int generation = 0;
+
         while (keepDividing)
         {
             keepDividing = false;
             generation++;
+
             foreach (var room in finalRooms)
             {
                 if (TrySplit(room, out RectInt roomA, out RectInt roomB))
@@ -138,6 +142,14 @@ public class DungeonGeneratorScript : MonoBehaviour
                 }
             }
             ApplyQueuedRoomChanges();
+
+            bool stopSplitting = StopSplitting(generation);
+
+            if (stopSplitting)
+            {
+                AlgorithmsUtils.DebugRectInt(startRoomParams, Color.red, 5f);
+                break;
+            }
         }
     }
 
@@ -200,6 +212,14 @@ public class DungeonGeneratorScript : MonoBehaviour
             return false;
 
         return UnityEngine.Random.Range(0, 100) < preservedRoomChance;
+    }
+
+    private bool StopSplitting(int generation)
+    {
+        if (generation < generationsBeforeChanceToStopCutting)
+            return false;
+
+        return UnityEngine.Random.Range(0, 100) < stopSplittingChance;
     }
 
     private void QueueRoomSplit(RectInt oldRoom, RectInt roomA, RectInt roomB)
@@ -624,12 +644,14 @@ public class DungeonGeneratorScript : MonoBehaviour
     {
         keepDividing = true;
         int generation = 0;
+
         while (keepDividing)
         {
             keepDividing = false;
+            generation++;
+
             foreach (var room in finalRooms)
             {
-                generation++;
                 if (TrySplit(room, out RectInt roomA, out RectInt roomB))
                 {
                     bool preserveRoom = PreserveRoom(generation);
@@ -663,6 +685,14 @@ public class DungeonGeneratorScript : MonoBehaviour
                 }
             }
             ApplyQueuedRoomChanges();
+
+            bool stopSplitting = StopSplitting(generation);
+
+            if (stopSplitting)
+            {
+                AlgorithmsUtils.DebugRectInt(startRoomParams, Color.red, 2f);
+                break;
+            }
         }
     }
 
@@ -810,7 +840,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
                 doors.Remove(wallDoor);
 
-                yield return new WaitForSeconds(0.3f);
+                yield return new WaitForSeconds(0.1f);
             }
         }
     }
