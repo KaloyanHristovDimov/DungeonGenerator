@@ -10,14 +10,14 @@ using UnityEngine;
 public class DungeonGeneratorScript : MonoBehaviour
 {
     [Header("Generation Settings")]
-    [SerializeField] private int minRoomSize = 6;
-    [SerializeField] private RectInt startRoomParams = new RectInt(0, 0, 100, 100);
-    [SerializeField] private float randomSizeMin = 0.05f;
-    [SerializeField] private float randomSizeMax = 0.75f;
-    [SerializeField] private int generationsBeforePreservedRooms = 5;
-    [SerializeField] private int generationsBeforeChanceToStopCutting = 5;
-    [SerializeField] private int preservedRoomChance = 20;
-    [SerializeField] private int stopSplittingChance = 15;
+    [SerializeField] private int minRoomSize = 8; 
+    [SerializeField] private RectInt startRoomParams = new RectInt(0, 0, 100, 100); 
+    [SerializeField] private float randomSizeMin = 0.05f; 
+    [SerializeField] private float randomSizeMax = 0.75f; 
+    [SerializeField] private int generationsBeforePreservedRooms = 8; 
+    [SerializeField] private int generationsBeforeChanceToStopCutting = 13; 
+    [SerializeField] private int preservedRoomChance = 20; 
+    [SerializeField] private int stopSplittingChance = 12;
 
     [Header("Prefabs")]
     [SerializeField] private GameObject floorPrefab;
@@ -72,9 +72,9 @@ public class DungeonGeneratorScript : MonoBehaviour
             GenerateDungeon();
     }
 
-    private void SeedPick() 
+    private void SeedPick()
     {
-        if (useRandomSeed) 
+        if (useRandomSeed)
         {
             seed = UnityEngine.Random.Range(0, int.MaxValue);
         }
@@ -88,7 +88,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         graph = new Vector3Graph();
 
         DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
-        
+
         AddBaseRoom();
 
         DivideRooms();
@@ -108,7 +108,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         DrawRooms();
     }
 
-    private void AddBaseRoom() 
+    private void AddBaseRoom()
     {
         finalRooms.Clear();
 
@@ -116,7 +116,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         finalRooms.Add(baseRoom);
     }
 
-    private void DivideRooms() 
+    private void DivideRooms()
     {
         keepDividing = true;
         int generation = 0;
@@ -155,7 +155,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
     private bool TrySplit(RectInt room, out RectInt roomA, out RectInt roomB)
     {
-        roomA = default ;
+        roomA = default;
         roomB = default;
 
         if (RandomBool())
@@ -188,7 +188,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
-    private int GetRandomSplitSize(int usableSize) 
+    private int GetRandomSplitSize(int usableSize)
     {
         float minRatio = (float)minRoomSize / usableSize;
         float ratio = UnityEngine.Random.Range(randomSizeMin, randomSizeMax);
@@ -206,7 +206,7 @@ public class DungeonGeneratorScript : MonoBehaviour
             return smallSize;
     }
 
-    private bool PreserveRoom(int generation) 
+    private bool PreserveRoom(int generation)
     {
         if (generation < generationsBeforePreservedRooms)
             return false;
@@ -270,12 +270,12 @@ public class DungeonGeneratorScript : MonoBehaviour
             RectInt smallestRoom;
             float size;
             bool removed = false;
-            while (!removed && roomPool.Count() > 0) 
+            while (!removed && roomPool.Count() > 0)
             {
                 smallestRoom = roomPool[0];
                 size = smallestRoom.width * smallestRoom.height;
 
-                foreach (var room in roomPool) 
+                foreach (var room in roomPool)
                 {
                     float currentRoomSize = room.width * room.height;
                     if (size > currentRoomSize)
@@ -293,9 +293,9 @@ public class DungeonGeneratorScript : MonoBehaviour
                             roomPool.Remove(room);
                             removed = true;
                         }
-                        else 
+                        else
                             roomPool.Remove(room);
-                        
+
                         break;
                     }
                 }
@@ -310,7 +310,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         Debug.Log($"Rooms removed: {removedRooms}");
     }
 
-    private bool CanRemove(RectInt room) 
+    private bool CanRemove(RectInt room)
     {
         List<RectInt> remainingRooms = new List<RectInt>(finalRooms);
         remainingRooms.Remove(room);
@@ -386,9 +386,9 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
-    private bool IsVerticalIntersection(RectInt intersection) 
+    private bool IsVerticalIntersection(RectInt intersection)
     {
-        if(intersection.width == 0 && intersection.height > 1)
+        if (intersection.width == 0 && intersection.height > 1)
             return true;
         return false;
     }
@@ -400,23 +400,23 @@ public class DungeonGeneratorScript : MonoBehaviour
         return false;
     }
 
-    private void DecideDoors() 
+    private void DecideDoors()
     {
         doors.Clear();
-        foreach (var line in sharedWallLines) 
+        foreach (var line in sharedWallLines)
         {
             bool isAtEdge = true;
             Vector3 doorPosition = new Vector3();
-            while (isAtEdge) 
+            while (isAtEdge)
             {
                 doorPosition = Vector3.Lerp(line.start, line.end, UnityEngine.Random.value);
                 doorPosition.x = Mathf.Round(doorPosition.x);
                 doorPosition.y = 0.5f;
                 doorPosition.z = Mathf.Round(doorPosition.z);
-                if(doorPosition.x > 1 && doorPosition.z > 1)
+                if (doorPosition.x > 1 && doorPosition.z > 1)
                     isAtEdge = false;
             }
-            
+
 
             doors.Add(doorPosition);
 
@@ -429,7 +429,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
-    private void RemoveExtraDoors() 
+    private void RemoveExtraDoors()
     {
         List<Vector3> roomNodes = GetRoomNodes();
 
@@ -437,7 +437,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         ShuffleList(doorPool);
 
-        foreach (var wallDoor in doorPool) 
+        foreach (var wallDoor in doorPool)
         {
             Vector3 graphDoor = new Vector3(wallDoor.x - 0.5f, wallDoor.y - 0.5f, wallDoor.z - 0.5f);
             if (graph.CanRemoveNodeWithoutDisconnecting(graphDoor, roomNodes))
@@ -474,7 +474,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
-    private void SpawnAssets() 
+    private void SpawnAssets()
     {
         wallPositions.Clear();
         floorPositions.Clear();
@@ -509,7 +509,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
-    private void SetTakenPositions() 
+    private void SetTakenPositions()
     {
         foreach (var r in finalRooms)
         {
@@ -526,7 +526,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
-    private int[,] GenerateTileMap() 
+    private int[,] GenerateTileMap()
     {
         int[,] tileMap = new int[startRoomParams.width, startRoomParams.height];
         int rows = tileMap.GetLength(0);
@@ -557,29 +557,134 @@ public class DungeonGeneratorScript : MonoBehaviour
             + tileMap[x + 1, y] * 8;
     }
 
-    private void SpawnFloor() 
+    private void SpawnFloor()
     {
         GameObject floorParent = new GameObject("Floor");
         Transform floorTransform = floorParent.transform;
 
-        foreach (var room in finalRooms) 
+        HashSet<Vector2Int> passableTiles = BuildPassableFloorTiles();
+        HashSet<Vector2Int> stopTiles = BuildWallStopTiles();
+
+        Vector2Int startTile = GetRandomRoomCenterTile();
+
+        HashSet<Vector2Int> reachedTiles = FloodFillFloor(startTile, passableTiles, stopTiles);
+
+        foreach (Vector2Int tile in reachedTiles)
         {
-            for (int i = 0; i < room.height; i++) 
+            Vector3 position = new Vector3(tile.x, 0f, tile.y);
+
+            floorPrefab.transform.position = position;
+
+            floorPositions.Add(position);
+
+            Instantiate(floorPrefab, floorTransform);
+        }
+    }
+
+    private HashSet<Vector2Int> BuildPassableFloorTiles()
+    {
+        HashSet<Vector2Int> passableTiles = new HashSet<Vector2Int>();
+
+        foreach (RectInt room in finalRooms)
+        {
+            for (int x = room.xMin + 1; x < room.xMax; x++)
             {
-                for (int j = 0; j < room.width; j++) 
+                for (int z = room.yMin + 1; z < room.yMax; z++)
                 {
-                    Vector3 position = new Vector3(room.xMin + j, 0f, room.yMin + i);
-                    if (position.x != 0 && position.z != 0) 
-                    {
-                        floorPrefab.transform.position = new Vector3(position.x, 0f, position.z);
-
-                        floorPositions.Add(position);
-
-                        Instantiate(floorPrefab, floorTransform);
-                    }
+                    passableTiles.Add(new Vector2Int(x, z));
                 }
             }
         }
+
+        foreach (Vector3 door in doors)
+        {
+            Vector2Int doorTile = new Vector2Int(
+                Mathf.RoundToInt(door.x),
+                Mathf.RoundToInt(door.z)
+            );
+
+            passableTiles.Add(doorTile);
+        }
+
+        return passableTiles;
+    }
+
+    private HashSet<Vector2Int> BuildWallStopTiles()
+    {
+        HashSet<Vector2Int> stopTiles = new HashSet<Vector2Int>();
+
+        foreach (Vector3 wallPosition in wallPositions)
+        {
+            Vector2Int wallTile = new Vector2Int(
+                Mathf.RoundToInt(wallPosition.x),
+                Mathf.RoundToInt(wallPosition.z)
+            );
+
+            stopTiles.Add(wallTile);
+        }
+
+        return stopTiles;
+    }
+
+    private Vector2Int GetRandomRoomCenterTile()
+    {
+        RectInt room = finalRooms[UnityEngine.Random.Range(0, finalRooms.Count)];
+
+        int x = Mathf.RoundToInt(room.center.x);
+        int z = Mathf.RoundToInt(room.center.y);
+
+        x = Mathf.Clamp(x, room.xMin + 1, room.xMax - 1);
+        z = Mathf.Clamp(z, room.yMin + 1, room.yMax - 1);
+
+        return new Vector2Int(x, z);
+    }
+
+    private HashSet<Vector2Int> FloodFillFloor(Vector2Int startTile, HashSet<Vector2Int> passableTiles, HashSet<Vector2Int> stopTiles)
+    {
+        HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
+        Queue<Vector2Int> tilesToCheck = new Queue<Vector2Int>();
+
+        visited.Add(startTile);
+        tilesToCheck.Enqueue(startTile);
+
+        Vector2Int[] directions =
+        {
+    new Vector2Int(1, 0),
+    new Vector2Int(-1, 0),
+    new Vector2Int(0, 1),
+    new Vector2Int(0, -1)
+    };
+
+        while (tilesToCheck.Count > 0)
+        {
+            Vector2Int currentTile = tilesToCheck.Dequeue();
+
+            if (stopTiles.Contains(currentTile))
+                continue;
+
+            foreach (Vector2Int direction in directions)
+            {
+                Vector2Int neighbour = currentTile + direction;
+
+                if (visited.Contains(neighbour))
+                    continue;
+
+                bool isPassableTile = passableTiles.Contains(neighbour);
+                bool isStopTile = stopTiles.Contains(neighbour);
+
+                if (!isPassableTile && !isStopTile)
+                    continue;
+
+                visited.Add(neighbour);
+
+                if (isPassableTile)
+                {
+                    tilesToCheck.Enqueue(neighbour);
+                }
+            }
+        }
+
+        return visited;
     }
 
     private void SpawnGameplayObjects()
@@ -589,7 +694,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         navMeshSurface = navmesh.GetComponent<NavMeshSurface>();
         navMeshSurface.BuildNavMesh();
 
-        int playerPosition = UnityEngine.Random.Range(0, floorPositions.Count );
+        int playerPosition = UnityEngine.Random.Range(0, floorPositions.Count);
         GameObject player = Instantiate(playerPrefab);
         player.transform.position = floorPositions[playerPosition];
 
@@ -618,7 +723,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
     //Slow debug generation
     [Button]
-    private IEnumerator SlowGenerateDungeon() 
+    private IEnumerator SlowGenerateDungeon()
     {
         graph = new Vector3Graph();
         DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
@@ -636,7 +741,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         yield return StartCoroutine(SlowRemoveExtraDoors());
         yield return StartCoroutine(graph.SlowPrintGraph());
         yield return StartCoroutine(SlowSpawnAssets());
-        
+
         SpawnGameplayObjects();
     }
 
@@ -655,7 +760,7 @@ public class DungeonGeneratorScript : MonoBehaviour
                 if (TrySplit(room, out RectInt roomA, out RectInt roomB))
                 {
                     bool preserveRoom = PreserveRoom(generation);
-                    
+
                     if (preserveRoom)
                     {
                         DebugDrawingBatcher.GetInstance().BatchCall(() =>
@@ -708,12 +813,12 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         RectInt smallestRoom;
         float size;
-        
+
 
         for (int i = 0; i < smallRoomsToRemove; i++)
         {
             bool removed = false;
-            while (!removed && roomPool.Count() > 0) 
+            while (!removed && roomPool.Count() > 0)
             {
                 smallestRoom = roomPool[0];
                 size = smallestRoom.width * smallestRoom.height;
@@ -741,10 +846,10 @@ public class DungeonGeneratorScript : MonoBehaviour
                             removed = true;
                             yield return new WaitForSeconds(0.5f);
                         }
-                        else 
+                        else
                         {
                             roomPool.Remove(room);
-                        } 
+                        }
 
                         break;
                     }
@@ -830,7 +935,7 @@ public class DungeonGeneratorScript : MonoBehaviour
             Vector3 graphDoor = new Vector3(wallDoor.x - 0.5f, wallDoor.y - 0.5f, wallDoor.z - 0.5f);
             if (graph.CanRemoveNodeWithoutDisconnecting(graphDoor, roomNodes))
             {
-                RectInt deletedDoor = new RectInt((int)(wallDoor.x-0.5f), (int)(wallDoor.z-0.5f), 1, 1);
+                RectInt deletedDoor = new RectInt((int)(wallDoor.x - 0.5f), (int)(wallDoor.z - 0.5f), 1, 1);
                 DebugDrawingBatcher.GetInstance().BatchCall(() =>
                 {
                     AlgorithmsUtils.DebugRectInt(deletedDoor, Color.red);
@@ -884,24 +989,25 @@ public class DungeonGeneratorScript : MonoBehaviour
         GameObject floorParent = new GameObject("Floor");
         Transform floorTransform = floorParent.transform;
 
-        foreach (var room in finalRooms)
+        HashSet<Vector2Int> passableTiles = BuildPassableFloorTiles();
+        HashSet<Vector2Int> stopTiles = BuildWallStopTiles();
+
+        Vector2Int startTile = GetRandomRoomCenterTile();
+
+        HashSet<Vector2Int> reachedTiles = FloodFillFloor(startTile, passableTiles, stopTiles);
+
+        foreach (Vector2Int tile in reachedTiles)
         {
-            for (int i = 0; i < room.height; i++)
-            {
-                for (int j = 0; j < room.width; j++)
-                {
-                    Vector3 position = new Vector3(room.xMin + j, 0f, room.yMin + i);
-                    if (position.x != 0 && position.z != 0)
-                    {
-                        floorPrefab.transform.position = new Vector3(position.x, 0f, position.z);
+            Vector3 position = new Vector3(tile.x, 0f, tile.y);
 
-                        floorPositions.Add(position);
+            floorPrefab.transform.position = position;
 
-                        Instantiate(floorPrefab, floorTransform);
-                    }
-                }
-            }
-            yield return new WaitForSeconds(0.1f);
+            floorPositions.Add(position);
+
+            Instantiate(floorPrefab, floorTransform);
+
+            yield return null;
         }
     }
+
 }

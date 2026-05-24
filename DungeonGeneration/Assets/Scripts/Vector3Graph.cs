@@ -129,7 +129,7 @@ public class Vector3Graph
                 DebugExtension.DebugWireSphere(node.Key, Color.green, 0.5f);
             });
 
-            yield return new WaitForSeconds(0.1f);
+            //yield return new WaitForSeconds(0.1f);
 
             foreach (var neighbor in node.Value)
             {
