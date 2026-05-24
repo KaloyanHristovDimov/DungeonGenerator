@@ -613,6 +613,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         //Doors depend on intersections, and walls depend on doors.
         yield return StartCoroutine(SlowFindIntersections());
+        yield return StartCoroutine(SlowRemoveExtraDoors());
         yield return StartCoroutine(graph.SlowPrintGraph());
         yield return StartCoroutine(SlowSpawnAssets());
         
@@ -756,10 +757,17 @@ public class DungeonGeneratorScript : MonoBehaviour
         doors.Clear();
         foreach (var line in sharedWallLines)
         {
-            Vector3 doorPosition = Vector3.Lerp(line.start, line.end, UnityEngine.Random.value);
-            doorPosition.x = Mathf.Round(doorPosition.x);
-            doorPosition.y = 0.5f;
-            doorPosition.z = Mathf.Round(doorPosition.z);
+            bool isAtEdge = true;
+            Vector3 doorPosition = new Vector3();
+            while (isAtEdge)
+            {
+                doorPosition = Vector3.Lerp(line.start, line.end, UnityEngine.Random.value);
+                doorPosition.x = Mathf.Round(doorPosition.x);
+                doorPosition.y = 0.5f;
+                doorPosition.z = Mathf.Round(doorPosition.z);
+                if (doorPosition.x > 1 && doorPosition.z > 1)
+                    isAtEdge = false;
+            }
 
             doors.Add(doorPosition);
 
@@ -771,10 +779,39 @@ public class DungeonGeneratorScript : MonoBehaviour
             yield return new WaitForSeconds(0.02f);
 
             doorPosition.x -= 0.5f;
+            doorPosition.y -= 0.5f;
             doorPosition.z -= 0.5f;
 
             graph.AddEdge(line.roomA, doorPosition);
             graph.AddEdge(doorPosition, line.roomB);
+        }
+    }
+
+    private IEnumerator SlowRemoveExtraDoors()
+    {
+        List<Vector3> roomNodes = GetRoomNodes();
+
+        List<Vector3> doorPool = new List<Vector3>(doors);
+
+        ShuffleList(doorPool);
+
+        foreach (var wallDoor in doorPool)
+        {
+            Vector3 graphDoor = new Vector3(wallDoor.x - 0.5f, wallDoor.y - 0.5f, wallDoor.z - 0.5f);
+            if (graph.CanRemoveNodeWithoutDisconnecting(graphDoor, roomNodes))
+            {
+                RectInt deletedDoor = new RectInt((int)(wallDoor.x-0.5f), (int)(wallDoor.z-0.5f), 1, 1);
+                DebugDrawingBatcher.GetInstance().BatchCall(() =>
+                {
+                    AlgorithmsUtils.DebugRectInt(deletedDoor, Color.red);
+                });
+
+                graph.RemoveNode(graphDoor);
+
+                doors.Remove(wallDoor);
+
+                yield return new WaitForSeconds(0.3f);
+            }
         }
     }
 
