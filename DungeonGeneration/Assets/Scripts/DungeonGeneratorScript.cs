@@ -696,7 +696,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         int playerPosition = UnityEngine.Random.Range(0, floorPositions.Count);
         GameObject player = Instantiate(playerPrefab);
-        player.transform.position = floorPositions[playerPosition];
+        player.transform.position = new Vector3(floorPositions[playerPosition].x, 0.5f, floorPositions[playerPosition].z);
 
         Instantiate(cameraPrefab);
         player.AddComponent<PlayerController>();
@@ -1009,5 +1009,4 @@ public class DungeonGeneratorScript : MonoBehaviour
             yield return null;
         }
     }
-
 }
