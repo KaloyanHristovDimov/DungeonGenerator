@@ -9,20 +9,30 @@ using Unity.AI.Navigation;
 using UnityEditor;
 using UnityEngine;
 
+/// <summary>
+/// Procedurally generates a dungeon by recursively splitting a starting rectangle into rooms,
+/// optionally preserving larger rooms, removing some small rooms while keeping the layout connected,
+/// creating doors between neighbouring rooms, removing unnecessary doors through graph connectivity checks,
+/// and finally spawning walls, floors, NavMesh, player, camera, UI, and debug visuals.
+/// 
+/// The script supports both instant generation and slow debug generation.
+/// Slow generation performs the same main steps but yields between operations so the process can be visualized.
+/// </summary>
 public class DungeonGeneratorScript : MonoBehaviour
 {
     [Header("Generation Settings")]
+    // Controls the size, randomness, recursion depth, room preservation,
+    // stopping chance, and percentage of small rooms removed after generation.
     [SerializeField] private int minRoomSize = 8;
     [SerializeField] private RectInt startRoomParams = new RectInt(0, 0, 200, 200);
     [SerializeField] private float randomSizeMin = 0.05f;
     [SerializeField] private float randomSizeMax = 0.75f;
     [SerializeField] private int generationsBeforePreservedRooms = 8;
-    [SerializeField] private int generationsBeforeChanceToStopCutting = 13;
     [SerializeField] private int preservedRoomChance = 20;
-    [SerializeField] private int stopSplittingChance = 12;
     [SerializeField] private int deleteRoomPercentage = 10;
 
     [Header("Prefabs")]
+    // Prefabs spawned after the logical dungeon layout has been generated.
     [SerializeField] private GameObject floorPrefab;
     [SerializeField] private GameObject playerPrefab;
     [SerializeField] private GameObject cameraPrefab;
@@ -32,12 +42,17 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private List<GameObject> wallPrefabs;
 
     [Header("Optional")]
+    // Debug and reproducibility options.
+    // wait controls whether generation is visualized slowly or created immediately.
+    // useRandomSeed decides whether the seed is randomized each run.
     [SerializeField] private bool wait = false;
     [SerializeField] private bool useRandomSeed = true;
     [SerializeField] private int seed = 1;
     [SerializeField] private bool immediateStart = true;
 
     [Header("Inspector prep")]
+    // Root objects with these names are kept when regenerating the scene.
+    // Everything else is deleted before a new dungeon is generated.
     [SerializeField] private List<string> objectsToKeepByName = new List<string>() 
     {
         "Dungeon Generator",
@@ -49,15 +64,30 @@ public class DungeonGeneratorScript : MonoBehaviour
     private Transform dungeonParent;
     private float WaitTime;
 
+    // Main room collections.
+    // roomsPreserved stores rooms that stopped splitting early because of preservation.
+    // finalRooms contains the rooms used for the final dungeon layout.
+    // roomsToRemove stores rooms selected for deletion.
     private List<RectInt> roomsPreserved = new List<RectInt>();
     private List<RectInt> finalRooms = new List<RectInt>();
     private List<RectInt> roomsToRemove = new List<RectInt>();
+
+    // Generated world-space positions used for spawning and path/floor logic.
     private List<Vector3> wallPositions = new List<Vector3>();
     private List<Vector3> doors = new List<Vector3>();
     private List<Vector3> floorPositions = new List<Vector3>();
     private List<Vector3> playerSpawnPositions = new List<Vector3>();
     private NavMeshSurface navMeshSurface = null;
+
+    // Lines representing shared walls between rooms.
+    // These are later used to place possible doors.
     private List<Vector3Line> sharedWallLines = new List<Vector3Line>();
+
+    /// <summary>
+    /// Represents a shared wall segment between two rooms.
+    /// start and end define the usable section of the wall where a door can be placed.
+    /// roomA and roomB store the graph node positions of the rooms connected by this wall.
+    /// </summary>
     private struct Vector3Line
     {
         public Vector3 start;
@@ -75,6 +105,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Initializes generation settings, picks the random seed, creates the connectivity graph,
+    /// and optionally starts dungeon generation automatically.
+    /// </summary>
     void Start()
     {
         WaitTime = (startRoomParams.height + startRoomParams.width) / 20;
@@ -87,6 +121,11 @@ public class DungeonGeneratorScript : MonoBehaviour
                 StartSlowGenerateDungeon();
     }
 
+    /// <summary>
+    /// Picks a new random seed if random seeds are enabled,
+    /// then initializes Unity's random generator with the selected seed.
+    /// This makes generation either reproducible or different each run.
+    /// </summary>
     private void SeedPick()
     {
         if (useRandomSeed)
@@ -97,6 +136,11 @@ public class DungeonGeneratorScript : MonoBehaviour
     }
 
     //Immediate generation
+    /// <summary>
+    /// Starts instant dungeon generation.
+    /// Any currently running generation coroutine is stopped first,
+    /// allowing regeneration to safely replace an in-progress slow generation.
+    /// </summary>
     [Button("Generate Dungeon")]
     private void StartGenerateDungeon()
     {
@@ -104,6 +148,12 @@ public class DungeonGeneratorScript : MonoBehaviour
         StartCoroutine(GenerateDungeon());
     }
 
+    /// <summary>
+    /// Runs the full instant dungeon generation process.
+    /// This prepares the scene, creates rooms, removes unnecessary rooms,
+    /// finds shared walls, places and simplifies doors, spawns assets,
+    /// spawns gameplay objects, and draws debug room outlines.
+    /// </summary>
     private IEnumerator GenerateDungeon()
     {
         yield return StartCoroutine(PrepareSceneForGeneration());
@@ -126,6 +176,11 @@ public class DungeonGeneratorScript : MonoBehaviour
         DrawRooms();
     }
 
+    /// <summary>
+    /// Clears debug drawings and the Unity console, resets the graph,
+    /// deletes the old dungeon and unwanted root scene objects,
+    /// then creates a fresh Dungeon parent object for the new generated content.
+    /// </summary>
     private IEnumerator PrepareSceneForGeneration()
     {
         DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
@@ -152,6 +207,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         yield return null;
     }
 
+    /// <summary>
+    /// Clears the Unity Editor console using reflection.
+    /// This only works inside the Unity Editor because it uses UnityEditor.LogEntries.
+    /// </summary>
     private void ClearUnityConsole()
     {
         Assembly assembly = Assembly.GetAssembly(typeof(Editor));
@@ -165,6 +224,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         clearMethod.Invoke(null, null);
     }
 
+    /// <summary>
+    /// Safely destroys a GameObject using Destroy during play mode
+    /// and DestroyImmediate outside play mode.
+    /// </summary>
     private void DestroyObjectSafe(GameObject obj)
     {
         if (Application.isPlaying)
@@ -173,6 +236,9 @@ public class DungeonGeneratorScript : MonoBehaviour
             DestroyImmediate(obj);
     }
 
+    /// <summary>
+    /// Clears previous room data and starts recursive room division from the initial room rectangle.
+    /// </summary>
     private void DivideRooms()
     {
         finalRooms.Clear();
@@ -181,17 +247,17 @@ public class DungeonGeneratorScript : MonoBehaviour
         DivideRoomRecursive(startRoomParams, 1);
     }
 
+    /// <summary>
+    /// Recursively attempts to split a room into two smaller rooms.
+    /// If the room can no longer be split, it is added to the final room list.
+    /// If the room is selected for preservation, it is stored as a preserved room instead of being split further.
+    /// Otherwise, both resulting rooms continue through the same recursive splitting process.
+    /// </summary>
+    /// <param name="room">The room rectangle currently being processed.</param>
+    /// <param name="generation">The current recursion depth, used to decide whether preservation is allowed.</param>
     private void DivideRoomRecursive(RectInt room, int generation)
     {
-        bool stopSplitting = StopSplitting(generation);
-
         if (!TrySplit(room, out RectInt roomA, out RectInt roomB))
-        {
-            finalRooms.Add(room);
-            return;
-        }
-
-        if (stopSplitting)
         {
             finalRooms.Add(room);
             return;
@@ -209,6 +275,15 @@ public class DungeonGeneratorScript : MonoBehaviour
         DivideRoomRecursive(roomB, generation + 1);
     }
 
+    /// <summary>
+    /// Attempts to split a room either vertically or horizontally.
+    /// The split direction is chosen randomly if both directions are possible,
+    /// otherwise it uses the only valid direction.
+    /// </summary>
+    /// <param name="room">The room to split.</param>
+    /// <param name="roomA">The first resulting room.</param>
+    /// <param name="roomB">The second resulting room.</param>
+    /// <returns>True if the room was successfully split, false if it was too small.</returns>
     private bool TrySplit(RectInt room, out RectInt roomA, out RectInt roomB)
     {
         roomA = default;
@@ -257,6 +332,13 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Chooses a random split size for one axis while respecting the minimum room size.
+    /// The method sometimes returns the larger side and sometimes the smaller side
+    /// to avoid all splits leaning in the same direction.
+    /// </summary>
+    /// <param name="usableSize">The width or height being split.</param>
+    /// <returns>The size of the first part of the split.</returns>
     private int GetRandomSplitSize(int usableSize)
     {
         float minRatio = (float)minRoomSize / usableSize;
@@ -275,6 +357,12 @@ public class DungeonGeneratorScript : MonoBehaviour
             return smallSize;
     }
 
+    /// <summary>
+    /// Determines whether a room should be preserved instead of split further.
+    /// Preservation can only happen after a minimum generation depth has been reached.
+    /// </summary>
+    /// <param name="generation">The current recursion depth.</param>
+    /// <returns>True if the room should be preserved.</returns>
     private bool PreserveRoom(int generation)
     {
         if (generation < generationsBeforePreservedRooms)
@@ -283,14 +371,9 @@ public class DungeonGeneratorScript : MonoBehaviour
         return UnityEngine.Random.Range(0, 100) < preservedRoomChance;
     }
 
-    private bool StopSplitting(int generation)
-    {
-        if (generation < generationsBeforeChanceToStopCutting)
-            return false;
-
-        return UnityEngine.Random.Range(0, 100) < stopSplittingChance;
-    }
-
+    /// <summary>
+    /// Adds all preserved rooms back into the final room list after recursive division ends.
+    /// </summary>
     private void AddPreservedRooms()
     {
         foreach (var room in roomsPreserved)
@@ -300,6 +383,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         Debug.Log($"Made {finalRooms.Count} rooms");
     }
 
+    /// <summary>
+    /// Removes a percentage of the smallest rooms from the final room list.
+    /// Rooms are only removed if doing so does not disconnect the remaining room layout.
+    /// </summary>
     private void RemoveSmallestRooms()
     {
         roomsToRemove.Clear();
@@ -330,6 +417,13 @@ public class DungeonGeneratorScript : MonoBehaviour
         Debug.Log($"Rooms removed: {removedRooms}");
     }
 
+    /// <summary>
+    /// Checks whether a room can be removed without disconnecting the dungeon.
+    /// It temporarily removes the room, then performs a breadth-first search over the remaining rooms,
+    /// using shared wall intersections as connections.
+    /// </summary>
+    /// <param name="room">The room being tested for removal.</param>
+    /// <returns>True if all remaining rooms stay connected after removing this room.</returns>
     private bool CanRemove(RectInt room)
     {
         List<RectInt> remainingRooms = new List<RectInt>(finalRooms);
@@ -365,6 +459,11 @@ public class DungeonGeneratorScript : MonoBehaviour
         return visitedRooms.Count == remainingRooms.Count;
     }
 
+    /// <summary>
+    /// Finds all shared wall intersections between every pair of final rooms.
+    /// Valid intersections are converted into shared wall lines,
+    /// which are later used as possible door placement locations.
+    /// </summary>
     private void FindIntersections()
     {
         sharedWallLines.Clear();
@@ -387,6 +486,15 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Converts a valid room intersection into a shared wall line.
+    /// Vertical intersections create vertical wall lines,
+    /// horizontal intersections create horizontal wall lines.
+    /// One tile is removed from each end to avoid placing doors directly on corners.
+    /// </summary>
+    /// <param name="intersection">The shared edge between two rooms.</param>
+    /// <param name="roomA">The graph node position of the first room.</param>
+    /// <param name="roomB">The graph node position of the second room.</param>
     private void AddSharedWallLine(RectInt intersection, Vector3 roomA, Vector3 roomB)
     {
         if (IsVerticalIntersection(intersection))
@@ -405,6 +513,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Checks whether an intersection represents a vertical shared wall.
+    /// A vertical shared wall has no width but has enough height to place a door.
+    /// </summary>
     private bool IsVerticalIntersection(RectInt intersection)
     {
         if (intersection.width == 0 && intersection.height > 1)
@@ -412,6 +524,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         return false;
     }
 
+    /// <summary>
+    /// Checks whether an intersection represents a horizontal shared wall.
+    /// A horizontal shared wall has no height but has enough width to place a door.
+    /// </summary>
     private bool IsHorizontalIntersection(RectInt intersection)
     {
         if (intersection.width > 1 && intersection.height == 0)
@@ -419,6 +535,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         return false;
     }
 
+    /// <summary>
+    /// Places one door on each shared wall line.
+    /// Each door is also added to the dungeon graph as a node connecting the two rooms.
+    /// </summary>
     private void DecideDoors()
     {
         doors.Clear();
@@ -449,6 +569,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         Debug.Log($"Made {doors.Count} doors");
     }
 
+    /// <summary>
+    /// Removes unnecessary doors while keeping all room nodes connected in the graph.
+    /// Doors are checked in random order so the remaining door layout varies between generations.
+    /// </summary>
     private void RemoveExtraDoors()
     {
         List<Vector3> roomNodes = GetRoomNodes();
@@ -474,6 +598,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         Debug.Log($"Removed {doorsRemoved} doors");
     }
 
+    /// <summary>
+    /// Converts all final rooms into graph node positions using their center points.
+    /// These nodes are used when checking whether removing doors disconnects the dungeon.
+    /// </summary>
     private List<Vector3> GetRoomNodes()
     {
         List<Vector3> roomNodes = new List<Vector3>();
@@ -487,6 +615,9 @@ public class DungeonGeneratorScript : MonoBehaviour
         return roomNodes;
     }
 
+    /// <summary>
+    /// Randomly shuffles a list in-place using the Fisher-Yates shuffle algorithm.
+    /// </summary>
     private void ShuffleList<T>(List<T> list)
     {
         for (int i = 0; i < list.Count; i++)
@@ -499,6 +630,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Clears previously calculated wall and floor positions,
+    /// then spawns the dungeon walls and floor tiles.
+    /// </summary>
     private void SpawnAssets()
     {
         wallPositions.Clear();
@@ -508,6 +643,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         SpawnFloor();
     }
 
+    /// <summary>
+    /// Generates the wall tile map and spawns wall prefabs based on 2x2 tile patterns.
+    /// Each 2x2 pattern produces a prefab index from 0 to 15.
+    /// </summary>
     private void SpawnWalls()
     {
         SetTakenPositions();
@@ -535,6 +674,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Calculates all wall positions around the borders of final rooms,
+    /// excluding positions occupied by doors.
+    /// </summary>
     private void SetTakenPositions()
     {
         foreach (var r in finalRooms)
@@ -552,6 +695,11 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Converts the wall position list into a 2D tile map.
+    /// A value of 1 means a wall exists at that tile,
+    /// while 0 means the tile is empty.
+    /// </summary>
     private int[,] GenerateTileMap()
     {
         int[,] tileMap = new int[startRoomParams.width, startRoomParams.height];
@@ -575,6 +723,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         return tileMap;
     }
 
+    /// <summary>
+    /// Converts a 2x2 section of the wall tile map into a prefab index.
+    /// Each corner contributes one bit, producing values from 0 to 15.
+    /// </summary>
     private int GetWallPrefabIndex(int[,] tileMap, int x, int y)
     {
         return tileMap[x, y]
@@ -583,6 +735,12 @@ public class DungeonGeneratorScript : MonoBehaviour
             + tileMap[x + 1, y] * 8;
     }
 
+    /// <summary>
+    /// Spawns floor tiles using flood fill.
+    /// The flood fill starts from a random room center and spreads through passable room and door tiles,
+    /// stopping at wall tiles.
+    /// Valid non-wall floor tiles are also stored as possible player spawn positions.
+    /// </summary>
     private void SpawnFloor()
     {
         playerSpawnPositions.Clear();
@@ -614,6 +772,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Builds a set of all tiles that the floor fill is allowed to pass through.
+    /// This includes room interior tiles and door tiles.
+    /// </summary>
     private HashSet<Vector2Int> BuildPassableFloorTiles()
     {
         HashSet<Vector2Int> passableTiles = new HashSet<Vector2Int>();
@@ -642,6 +804,11 @@ public class DungeonGeneratorScript : MonoBehaviour
         return passableTiles;
     }
 
+    /// <summary>
+    /// Builds a set of wall tiles where the flood fill should stop.
+    /// These tiles may still be reached so floor can touch the walls,
+    /// but the fill should not continue past them.
+    /// </summary>
     private HashSet<Vector2Int> BuildWallStopTiles()
     {
         HashSet<Vector2Int> stopTiles = new HashSet<Vector2Int>();
@@ -659,6 +826,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         return stopTiles;
     }
 
+    /// <summary>
+    /// Picks a random final room and returns a clamped tile near its center.
+    /// This is used as the starting point for floor flood fill.
+    /// </summary>
     private Vector2Int GetRandomRoomCenterTile()
     {
         RectInt room = finalRooms[UnityEngine.Random.Range(0, finalRooms.Count)];
@@ -672,6 +843,15 @@ public class DungeonGeneratorScript : MonoBehaviour
         return new Vector2Int(x, z);
     }
 
+    /// <summary>
+    /// Performs a breadth-first flood fill from the starting tile.
+    /// The fill can move through passable tiles and can include stop tiles,
+    /// but it does not continue expanding from stop tiles.
+    /// </summary>
+    /// <param name="startTile">The tile where the fill starts.</param>
+    /// <param name="passableTiles">Tiles that the fill can move through.</param>
+    /// <param name="stopTiles">Tiles that stop further spreading, usually walls.</param>
+    /// <returns>All tiles reached by the flood fill.</returns>
     private HashSet<Vector2Int> FloodFillFloor(Vector2Int startTile, HashSet<Vector2Int> passableTiles, HashSet<Vector2Int> stopTiles)
     {
         HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
@@ -720,6 +900,11 @@ public class DungeonGeneratorScript : MonoBehaviour
         return visited;
     }
 
+    /// <summary>
+    /// Spawns gameplay-related objects after the dungeon geometry is generated.
+    /// This includes the NavMesh object, player, camera, UI, event system,
+    /// and the player controller component.
+    /// </summary>
     private void SpawnGameplayObjects()
     {
         GameObject gameplayObjectsParentObject = new GameObject("Gameplay objects");
@@ -741,6 +926,9 @@ public class DungeonGeneratorScript : MonoBehaviour
         Instantiate(eventSystem, gameplayObjectsParentTransform);
     }
 
+    /// <summary>
+    /// Draws debug outlines around all final rooms using the DebugDrawingBatcher.
+    /// </summary>
     private void DrawRooms()
     {
         foreach (var r in finalRooms)
@@ -752,12 +940,21 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Returns a random true or false value with equal probability.
+    /// </summary>
     private bool RandomBool()
     {
         return UnityEngine.Random.Range(0, 2) == 0;
     }
 
     //Slow debug generation
+
+    /// <summary>
+    /// Starts slow debug dungeon generation.
+    /// Any currently running generation coroutine is stopped first,
+    /// allowing a new generation to replace the previous one safely.
+    /// </summary>
     [Button("Slow Generate Dungeon")]
     private void StartSlowGenerateDungeon() 
     {
@@ -765,6 +962,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         StartCoroutine(SlowGenerateDungeon());
     }
 
+    /// <summary>
+    /// Runs the full dungeon generation process slowly with yields between major steps.
+    /// This is mainly used for debugging and visualizing the generation process.
+    /// </summary>
     private IEnumerator SlowGenerateDungeon()
     {
         yield return StartCoroutine(PrepareSceneForGeneration());
@@ -783,6 +984,9 @@ public class DungeonGeneratorScript : MonoBehaviour
         SpawnGameplayObjects();
     }
 
+    /// <summary>
+    /// Clears previous room data and starts the slow recursive room division process.
+    /// </summary>
     private IEnumerator SlowDivideRooms()
     {
         finalRooms.Clear();
@@ -791,10 +995,13 @@ public class DungeonGeneratorScript : MonoBehaviour
         yield return StartCoroutine(SlowDivideRoomRecursive(startRoomParams, 1));
     }
 
+    /// <summary>
+    /// Slow visual version of DivideRoomRecursive.
+    /// Draws rooms as they are split, preserved, or finalized,
+    /// yielding between steps so the process can be watched in the editor.
+    /// </summary>
     private IEnumerator SlowDivideRoomRecursive(RectInt room, int generation)
     {
-        bool stopSplitting = StopSplitting(generation);
-
         if (!TrySplit(room, out RectInt roomA, out RectInt roomB))
         {
             finalRooms.Add(room);
@@ -842,6 +1049,9 @@ public class DungeonGeneratorScript : MonoBehaviour
         yield return StartCoroutine(SlowDivideRoomRecursive(roomB, generation + 1));
     }
 
+    /// Slow visual version of RemoveSmallestRooms.
+    /// Removes small rooms one by one while drawing removed rooms in debug view.
+    /// </summary>
     private IEnumerator SlowRemoveSmallestRooms()
     {
         roomsToRemove.Clear();
@@ -878,6 +1088,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         Debug.Log($"Rooms removed: {removedRooms}");
     }
 
+    /// <summary>
+    /// Slow visual version of DecideDoors.
+    /// Places doors one by one and draws each created door in debug view.
+    /// </summary>
     private IEnumerator SlowDecideDoors()
     {
         doors.Clear();
@@ -914,6 +1128,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         Debug.Log($"Made {doors.Count} doors");
     }
 
+    /// <summary>
+    /// Slow visual version of RemoveExtraDoors.
+    /// Removes unnecessary doors one by one while drawing removed doors in debug view.
+    /// </summary>
     private IEnumerator SlowRemoveExtraDoors()
     {
         List<Vector3> roomNodes = GetRoomNodes();
@@ -946,6 +1164,11 @@ public class DungeonGeneratorScript : MonoBehaviour
         Debug.Log($"Removed {doorsRemoved} doors");
     }
 
+    /// <summary>
+    /// Slow version of SpawnAssets.
+    /// Spawns walls and floors over multiple frames to avoid freezing
+    /// and to make generation easier to observe.
+    /// </summary>
     private IEnumerator SlowSpawnAssets()
     {
         wallPositions.Clear();
@@ -955,6 +1178,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         yield return StartCoroutine(SlowSpawnFloor());
     }
 
+    /// <summary>
+    /// Slow version of SpawnWalls.
+    /// Spawns wall prefabs in batches and yields after enough walls have been created.
+    /// </summary>
     private IEnumerator SlowSpawnWalls()
     {
         SetTakenPositions();
@@ -988,6 +1215,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Slow version of SpawnFloor.
+    /// Spawns floor tiles in batches and yields periodically to spread work over multiple frames.
+    /// </summary>
     private IEnumerator SlowSpawnFloor()
     {
         playerSpawnPositions.Clear();
