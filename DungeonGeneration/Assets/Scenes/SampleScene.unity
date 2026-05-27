@@ -129,7 +129,7 @@ GameObject:
   m_Component:
   - component: {fileID: 33105998}
   m_Layer: 0
-  m_Name: General
+  m_Name: General light
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -388,9 +388,10 @@ MonoBehaviour:
   - {fileID: 1040310750116940119, guid: 988bdb5b8c8e5684f82e8aa72c31960a, type: 3}
   - {fileID: 2891759284571720867, guid: ef501ae38d35df8469fa26679054f194, type: 3}
   - {fileID: 4007745676147069824, guid: a4a5f9249e7746144a150e6b590e3c0f, type: 3}
-  wait: 1
+  wait: 0
   useRandomSeed: 1
   seed: 1
+  immediateStart: 1
 --- !u!4 &1411615435
 Transform:
   m_ObjectHideFlags: 0

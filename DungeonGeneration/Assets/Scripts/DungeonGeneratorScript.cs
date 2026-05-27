@@ -36,6 +36,7 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private bool immediateStart = true;
 
     private Vector3Graph graph;
+    private Transform dungeonParent;
 
     private List<RectInt> roomsPreserved = new List<RectInt>();
     private List<RectInt> finalRooms = new List<RectInt>();
@@ -107,6 +108,22 @@ public class DungeonGeneratorScript : MonoBehaviour
         SpawnGameplayObjects();
 
         DrawRooms();
+    }
+
+    private void ClearGeneratedParent()
+    {
+        GameObject oldDungeon = GameObject.Find("Dungeon");
+
+        if (oldDungeon != null)
+        {
+            if (Application.isPlaying)
+                Destroy(oldDungeon);
+            else
+                DestroyImmediate(oldDungeon);
+        }
+
+        GameObject newDungeon = new GameObject("Dungeon");
+        dungeonParent = newDungeon.transform;
     }
 
     private void DivideRooms()
@@ -446,6 +463,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         int rows = tileMap.GetLength(0);
         int cols = tileMap.GetLength(1);
         GameObject wallsParent = new GameObject("Walls");
+        wallsParent.transform.SetParent(dungeonParent);
 
         for (int i = 0; i <= rows - 2; i++)
         {
@@ -518,6 +536,8 @@ public class DungeonGeneratorScript : MonoBehaviour
         playerSpawnPositions.Clear();
 
         GameObject floorParent = new GameObject("Floor");
+        floorParent.transform.SetParent(dungeonParent);
+
         Transform floorTransform = floorParent.transform;
 
         HashSet<Vector2Int> passableTiles = BuildPassableFloorTiles();
@@ -650,20 +670,23 @@ public class DungeonGeneratorScript : MonoBehaviour
 
     private void SpawnGameplayObjects()
     {
-        GameObject navmesh = Instantiate(navMesh);
+        GameObject gameplayObjectsParentObject = new GameObject("Gameplay objects");
+        Transform gameplayObjectsParentTransform = gameplayObjectsParentObject.transform;
+        gameplayObjectsParentTransform.SetParent(dungeonParent);
+        GameObject navmesh = Instantiate(navMesh, gameplayObjectsParentTransform);
 
         navMeshSurface = navmesh.GetComponent<NavMeshSurface>();
         navMeshSurface.BuildNavMesh();
 
         int playerPosition = UnityEngine.Random.Range(0, playerSpawnPositions.Count);
         playerPrefab.transform.position = new Vector3(playerSpawnPositions[playerPosition].x, 1f, playerSpawnPositions[playerPosition].z);
-        GameObject player = Instantiate(playerPrefab);
+        GameObject player = Instantiate(playerPrefab, dungeonParent);
 
-        Instantiate(cameraPrefab);
+        Instantiate(cameraPrefab, gameplayObjectsParentTransform);
         player.AddComponent<PlayerController>();
 
-        Instantiate(uiPrefab);
-        Instantiate(eventSystem);
+        Instantiate(uiPrefab, gameplayObjectsParentTransform);
+        Instantiate(eventSystem, gameplayObjectsParentTransform);
     }
 
     private void DrawRooms()
@@ -687,6 +710,7 @@ public class DungeonGeneratorScript : MonoBehaviour
     private IEnumerator SlowGenerateDungeon()
     {
         graph = new Vector3Graph();
+
         DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
 
         yield return StartCoroutine(SlowDivideRooms());
@@ -899,6 +923,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         int rows = tileMap.GetLength(0);
         int cols = tileMap.GetLength(1);
         GameObject wallsParent = new GameObject("Walls");
+        wallsParent.transform.SetParent(dungeonParent);
 
         int counter = 0;
         for (int i = 0; i <= rows - 2; i++)
@@ -930,6 +955,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         GameObject floorParent = new GameObject("Floor");
         Transform floorTransform = floorParent.transform;
+        floorTransform.SetParent(dungeonParent);
 
         HashSet<Vector2Int> passableTiles = BuildPassableFloorTiles();
         HashSet<Vector2Int> stopTiles = BuildWallStopTiles();
@@ -959,5 +985,17 @@ public class DungeonGeneratorScript : MonoBehaviour
             if (passableTiles.Contains(tile) && !stopTiles.Contains(tile))
                 playerSpawnPositions.Add(position);
         }
+    }
+
+    [Button]
+    private IEnumerator RegenerateDungeon()
+    {
+        ClearGeneratedParent();
+
+        yield return null;
+        if (wait)
+            yield return StartCoroutine(SlowGenerateDungeon());
+        else
+            GenerateDungeon();
     }
 }
