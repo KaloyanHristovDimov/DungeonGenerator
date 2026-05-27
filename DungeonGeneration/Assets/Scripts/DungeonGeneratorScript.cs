@@ -4,8 +4,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.AI.Navigation;
-using UnityEditor.Overlays;
-using UnityEditor.Rendering;
 using UnityEngine;
 
 public class DungeonGeneratorScript : MonoBehaviour
@@ -35,17 +33,17 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private bool wait = false;
     [SerializeField] private bool useRandomSeed = true;
     [SerializeField] private int seed = 1;
+    [SerializeField] private bool immediateStart = true;
 
     private Vector3Graph graph;
 
     private List<RectInt> roomsPreserved = new List<RectInt>();
     private List<RectInt> finalRooms = new List<RectInt>();
-    private List<RectInt> newRooms = new List<RectInt>();
     private List<RectInt> roomsToRemove = new List<RectInt>();
-    private bool keepDividing = true;
     private List<Vector3> wallPositions = new List<Vector3>();
     private List<Vector3> doors = new List<Vector3>();
     private List<Vector3> floorPositions = new List<Vector3>();
+    private List<Vector3> playerSpawnPositions = new List<Vector3>();
     private NavMeshSurface navMeshSurface = null;
     private List<Vector3Line> sharedWallLines = new List<Vector3Line>();
     private struct Vector3Line
@@ -70,10 +68,11 @@ public class DungeonGeneratorScript : MonoBehaviour
         floorWaitTime = (startRoomParams.height + startRoomParams.width) / 20;
         SeedPick();
         graph = new Vector3Graph();
-        if (wait)
-            StartCoroutine(SlowGenerateDungeon());
-        else
-            GenerateDungeon();
+        if(immediateStart)
+            if (wait)
+                StartCoroutine(SlowGenerateDungeon());
+            else
+                GenerateDungeon();
     }
 
     private void SeedPick()
@@ -516,6 +515,8 @@ public class DungeonGeneratorScript : MonoBehaviour
 
     private void SpawnFloor()
     {
+        playerSpawnPositions.Clear();
+
         GameObject floorParent = new GameObject("Floor");
         Transform floorTransform = floorParent.transform;
 
@@ -535,6 +536,9 @@ public class DungeonGeneratorScript : MonoBehaviour
             floorPositions.Add(position);
 
             Instantiate(floorPrefab, floorTransform);
+
+            if (passableTiles.Contains(tile) && !stopTiles.Contains(tile))
+                playerSpawnPositions.Add(position);
         }
     }
 
@@ -651,9 +655,9 @@ public class DungeonGeneratorScript : MonoBehaviour
         navMeshSurface = navmesh.GetComponent<NavMeshSurface>();
         navMeshSurface.BuildNavMesh();
 
-        int playerPosition = UnityEngine.Random.Range(0, floorPositions.Count);
+        int playerPosition = UnityEngine.Random.Range(0, playerSpawnPositions.Count);
+        playerPrefab.transform.position = new Vector3(playerSpawnPositions[playerPosition].x, 1f, playerSpawnPositions[playerPosition].z);
         GameObject player = Instantiate(playerPrefab);
-        player.transform.position = new Vector3(floorPositions[playerPosition].x, 0.5f, floorPositions[playerPosition].z);
 
         Instantiate(cameraPrefab);
         player.AddComponent<PlayerController>();
@@ -922,6 +926,8 @@ public class DungeonGeneratorScript : MonoBehaviour
 
     private IEnumerator SlowSpawnFloor()
     {
+        playerSpawnPositions.Clear();
+
         GameObject floorParent = new GameObject("Floor");
         Transform floorTransform = floorParent.transform;
 
@@ -942,12 +948,16 @@ public class DungeonGeneratorScript : MonoBehaviour
             floorPositions.Add(position);
 
             Instantiate(floorPrefab, floorTransform);
+            
             if (counter > floorWaitTime*2)
             {
                 yield return null;
                 counter = 0;
             }
             counter++;
+
+            if (passableTiles.Contains(tile) && !stopTiles.Contains(tile))
+                playerSpawnPositions.Add(position);
         }
     }
 }
