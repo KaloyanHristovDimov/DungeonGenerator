@@ -1,5 +1,4 @@
 using NaughtyAttributes;
-using NUnit.Framework;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -20,6 +19,7 @@ using UnityEngine;
 /// </summary>
 public class DungeonGeneratorScript : MonoBehaviour
 {
+    #region Global Variables
     [Header("Generation Settings")]
     // Controls the size, randomness, recursion depth, room preservation,
     // stopping chance, and percentage of small rooms removed after generation.
@@ -29,7 +29,7 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private float randomSizeMax = 0.75f;
     [SerializeField] private int generationsBeforePreservedRooms = 8;
     [SerializeField] private int preservedRoomChance = 20;
-    [SerializeField] private int deleteRoomPercentage = 10;
+    [SerializeField] private int deleteRoomPercentage = 50;
 
     [Header("Prefabs")]
     // Prefabs spawned after the logical dungeon layout has been generated.
@@ -45,10 +45,10 @@ public class DungeonGeneratorScript : MonoBehaviour
     // Debug and reproducibility options.
     // wait controls whether generation is visualized slowly or created immediately.
     // useRandomSeed decides whether the seed is randomized each run.
-    [SerializeField] private bool wait = false;
     [SerializeField] private bool useRandomSeed = true;
-    [SerializeField] private int seed = 1;
     [SerializeField] private bool immediateStart = true;
+    [SerializeField] private bool useSlowGenerationImmediately = false;
+    [SerializeField] private int seed = 1;
 
     [Header("Inspector prep")]
     // Root objects with these names are kept when regenerating the scene.
@@ -82,7 +82,7 @@ public class DungeonGeneratorScript : MonoBehaviour
     // Lines representing shared walls between rooms.
     // These are later used to place possible doors.
     private List<Vector3Line> sharedWallLines = new List<Vector3Line>();
-
+    
     /// <summary>
     /// Represents a shared wall segment between two rooms.
     /// start and end define the usable section of the wall where a door can be placed.
@@ -104,7 +104,9 @@ public class DungeonGeneratorScript : MonoBehaviour
             this.roomB = roomB;
         }
     }
+    #endregion
 
+    #region Setup
     /// <summary>
     /// Initializes generation settings, picks the random seed, creates the connectivity graph,
     /// and optionally starts dungeon generation automatically.
@@ -115,7 +117,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         SeedPick();
         graph = new Vector3Graph();
         if (immediateStart)
-            if (wait)
+            if (useSlowGenerationImmediately)
                 StartGenerateDungeon();
             else
                 StartSlowGenerateDungeon();
@@ -133,47 +135,6 @@ public class DungeonGeneratorScript : MonoBehaviour
             seed = UnityEngine.Random.Range(0, int.MaxValue);
         }
         UnityEngine.Random.InitState(seed);
-    }
-
-    //Immediate generation
-    /// <summary>
-    /// Starts instant dungeon generation.
-    /// Any currently running generation coroutine is stopped first,
-    /// allowing regeneration to safely replace an in-progress slow generation.
-    /// </summary>
-    [Button("Generate Dungeon")]
-    private void StartGenerateDungeon()
-    {
-        StopAllCoroutines();
-        StartCoroutine(GenerateDungeon());
-    }
-
-    /// <summary>
-    /// Runs the full instant dungeon generation process.
-    /// This prepares the scene, creates rooms, removes unnecessary rooms,
-    /// finds shared walls, places and simplifies doors, spawns assets,
-    /// spawns gameplay objects, and draws debug room outlines.
-    /// </summary>
-    private IEnumerator GenerateDungeon()
-    {
-        yield return StartCoroutine(PrepareSceneForGeneration());
-
-        DivideRooms();
-
-        AddPreservedRooms();
-
-        RemoveSmallestRooms();
-
-        //Doors depend on intersections, and walls depend on doors.
-        FindIntersections();
-        DecideDoors();
-        RemoveExtraDoors();
-        graph.PrintGraph();
-        SpawnAssets();
-
-        SpawnGameplayObjects();
-
-        DrawRooms();
     }
 
     /// <summary>
@@ -235,7 +196,63 @@ public class DungeonGeneratorScript : MonoBehaviour
         else
             DestroyImmediate(obj);
     }
+    #endregion
 
+    #region Instant Generation
+    /// <summary>
+    /// Starts instant dungeon generation.
+    /// Any currently running generation coroutine is stopped first,
+    /// allowing regeneration to safely replace an in-progress slow generation.
+    /// </summary>
+    [Button("Generate Dungeon")]
+    private void StartGenerateDungeon()
+    {
+        StopAllCoroutines();
+        StartCoroutine(GenerateDungeon());
+    }
+
+    // Generation pipeline:
+    // 1. Prepare the scene.
+    // 2. Recursively split the starting area into rooms.
+    // 3. Add preserved rooms back into the final layout.
+    // 4. Remove some small rooms while preserving connectivity.
+    // 5. Find shared walls between rooms.
+    // 6. Place doors on shared walls.
+    // 7. Remove unnecessary doors while preserving graph connectivity.
+    // 8. Spawn walls and floor.
+    // 9. Spawn gameplay objects.
+    // 10. Draw debug room outlines.
+
+    /// <summary>
+    /// Runs the full instant dungeon generation process.
+    /// This prepares the scene, creates rooms, removes unnecessary rooms,
+    /// finds shared walls, places and simplifies doors, spawns assets,
+    /// spawns gameplay objects, and draws debug room outlines.
+    /// </summary>
+    private IEnumerator GenerateDungeon()
+    {
+        yield return StartCoroutine(PrepareSceneForGeneration());
+
+        DivideRooms();
+
+        AddPreservedRooms();
+
+        RemoveSmallestRooms();
+
+        //Doors depend on intersections, and walls depend on doors.
+        FindIntersections();
+        DecideDoors();
+        RemoveExtraDoors();
+        graph.PrintGraph();
+        SpawnAssets();
+
+        SpawnGameplayObjects();
+
+        DrawRooms();
+    }
+    #endregion
+
+    #region Room Generation
     /// <summary>
     /// Clears previous room data and starts recursive room division from the initial room rectangle.
     /// </summary>
@@ -382,7 +399,9 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
         Debug.Log($"Made {finalRooms.Count} rooms");
     }
+    #endregion
 
+    #region Room Removal
     /// <summary>
     /// Removes a percentage of the smallest rooms from the final room list.
     /// Rooms are only removed if doing so does not disconnect the remaining room layout.
@@ -458,7 +477,9 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         return visitedRooms.Count == remainingRooms.Count;
     }
+    #endregion
 
+    #region Intersections And Doors
     /// <summary>
     /// Finds all shared wall intersections between every pair of final rooms.
     /// Valid intersections are converted into shared wall lines,
@@ -535,6 +556,9 @@ public class DungeonGeneratorScript : MonoBehaviour
         return false;
     }
 
+    // Door positions are stored differently for walls and graph nodes.
+    // The doors list stores wall-space positions.
+    // The graph uses offset positions so door nodes sit between connected room nodes.
     /// <summary>
     /// Places one door on each shared wall line.
     /// Each door is also added to the dungeon graph as a node connecting the two rooms.
@@ -614,22 +638,9 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         return roomNodes;
     }
+    #endregion
 
-    /// <summary>
-    /// Randomly shuffles a list in-place using the Fisher-Yates shuffle algorithm.
-    /// </summary>
-    private void ShuffleList<T>(List<T> list)
-    {
-        for (int i = 0; i < list.Count; i++)
-        {
-            int randomIndex = UnityEngine.Random.Range(i, list.Count);
-
-            T temp = list[i];
-            list[i] = list[randomIndex];
-            list[randomIndex] = temp;
-        }
-    }
-
+    #region Wall Generation
     /// <summary>
     /// Clears previously calculated wall and floor positions,
     /// then spawns the dungeon walls and floor tiles.
@@ -649,8 +660,8 @@ public class DungeonGeneratorScript : MonoBehaviour
     /// </summary>
     private void SpawnWalls()
     {
-        SetTakenPositions();
-        int[,] tileMap = GenerateTileMap();
+        CalculateWallPositions();
+        int[,] tileMap = GenerateWallTileMap();
         int rows = tileMap.GetLength(0);
         int cols = tileMap.GetLength(1);
         GameObject wallsParent = new GameObject("Walls");
@@ -678,7 +689,7 @@ public class DungeonGeneratorScript : MonoBehaviour
     /// Calculates all wall positions around the borders of final rooms,
     /// excluding positions occupied by doors.
     /// </summary>
-    private void SetTakenPositions()
+    private void CalculateWallPositions()
     {
         foreach (var r in finalRooms)
         {
@@ -700,7 +711,7 @@ public class DungeonGeneratorScript : MonoBehaviour
     /// A value of 1 means a wall exists at that tile,
     /// while 0 means the tile is empty.
     /// </summary>
-    private int[,] GenerateTileMap()
+    private int[,] GenerateWallTileMap()
     {
         int[,] tileMap = new int[startRoomParams.width, startRoomParams.height];
         int rows = tileMap.GetLength(0);
@@ -734,7 +745,9 @@ public class DungeonGeneratorScript : MonoBehaviour
             + tileMap[x + 1, y + 1] * 4
             + tileMap[x + 1, y] * 8;
     }
+    #endregion
 
+    #region Floor Generation
     /// <summary>
     /// Spawns floor tiles using flood fill.
     /// The flood fill starts from a random room center and spreads through passable room and door tiles,
@@ -843,6 +856,9 @@ public class DungeonGeneratorScript : MonoBehaviour
         return new Vector2Int(x, z);
     }
 
+    // Stop tiles are allowed to be added to the reached tile list,
+    // but the flood fill does not continue expanding from them.
+    // This lets the floor reach wall edges without spilling outside the dungeon.
     /// <summary>
     /// Performs a breadth-first flood fill from the starting tile.
     /// The fill can move through passable tiles and can include stop tiles,
@@ -899,7 +915,9 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         return visited;
     }
+    #endregion
 
+    #region Gameplay Object Spawning
     /// <summary>
     /// Spawns gameplay-related objects after the dungeon geometry is generated.
     /// This includes the NavMesh object, player, camera, UI, event system,
@@ -925,7 +943,9 @@ public class DungeonGeneratorScript : MonoBehaviour
         Instantiate(uiPrefab, gameplayObjectsParentTransform);
         Instantiate(eventSystem, gameplayObjectsParentTransform);
     }
+    #endregion
 
+    #region Debug Drawing
     /// <summary>
     /// Draws debug outlines around all final rooms using the DebugDrawingBatcher.
     /// </summary>
@@ -939,17 +959,9 @@ public class DungeonGeneratorScript : MonoBehaviour
             });
         }
     }
+    #endregion
 
-    /// <summary>
-    /// Returns a random true or false value with equal probability.
-    /// </summary>
-    private bool RandomBool()
-    {
-        return UnityEngine.Random.Range(0, 2) == 0;
-    }
-
-    //Slow debug generation
-
+    #region Slow Debug Generation
     /// <summary>
     /// Starts slow debug dungeon generation.
     /// Any currently running generation coroutine is stopped first,
@@ -1184,8 +1196,8 @@ public class DungeonGeneratorScript : MonoBehaviour
     /// </summary>
     private IEnumerator SlowSpawnWalls()
     {
-        SetTakenPositions();
-        int[,] tileMap = GenerateTileMap();
+        CalculateWallPositions();
+        int[,] tileMap = GenerateWallTileMap();
         int rows = tileMap.GetLength(0);
         int cols = tileMap.GetLength(1);
         GameObject wallsParent = new GameObject("Walls");
@@ -1256,4 +1268,30 @@ public class DungeonGeneratorScript : MonoBehaviour
                 playerSpawnPositions.Add(position);
         }
     }
+    #endregion
+
+    #region Utility
+    /// <summary>
+    /// Randomly shuffles a list in-place using the Fisher-Yates shuffle algorithm.
+    /// </summary>
+    private void ShuffleList<T>(List<T> list)
+    {
+        for (int i = 0; i < list.Count; i++)
+        {
+            int randomIndex = UnityEngine.Random.Range(i, list.Count);
+
+            T temp = list[i];
+            list[i] = list[randomIndex];
+            list[randomIndex] = temp;
+        }
+    }
+
+    /// <summary>
+    /// Returns a random true or false value with equal probability.
+    /// </summary>
+    private bool RandomBool()
+    {
+        return UnityEngine.Random.Range(0, 2) == 0;
+    }
+    #endregion
 }
