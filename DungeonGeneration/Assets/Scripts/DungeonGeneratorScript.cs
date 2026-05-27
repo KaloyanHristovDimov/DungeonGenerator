@@ -1,4 +1,5 @@
 using NaughtyAttributes;
+using NUnit.Framework;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,14 +11,16 @@ using UnityEngine;
 public class DungeonGeneratorScript : MonoBehaviour
 {
     [Header("Generation Settings")]
-    [SerializeField] private int minRoomSize = 8; 
-    [SerializeField] private RectInt startRoomParams = new RectInt(0, 0, 100, 100); 
-    [SerializeField] private float randomSizeMin = 0.05f; 
-    [SerializeField] private float randomSizeMax = 0.75f; 
-    [SerializeField] private int generationsBeforePreservedRooms = 8; 
-    [SerializeField] private int generationsBeforeChanceToStopCutting = 13; 
-    [SerializeField] private int preservedRoomChance = 20; 
+    [SerializeField] private int minRoomSize = 8;
+    [SerializeField] private RectInt startRoomParams = new RectInt(0, 0, 100, 100);
+    [SerializeField] private float randomSizeMin = 0.05f;
+    [SerializeField] private float randomSizeMax = 0.75f;
+    [SerializeField] private int generationsBeforePreservedRooms = 8;
+    [SerializeField] private int generationsBeforeChanceToStopCutting = 13;
+    [SerializeField] private int preservedRoomChance = 20;
     [SerializeField] private int stopSplittingChance = 12;
+    [SerializeField] private int deleteRoomPercentage = 10;
+    [SerializeField] private int floorWaitTime = 10;
 
     [Header("Prefabs")]
     [SerializeField] private GameObject floorPrefab;
@@ -64,6 +67,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
     void Start()
     {
+        floorWaitTime = (startRoomParams.height + startRoomParams.width) / 20;
         SeedPick();
         graph = new Vector3Graph();
         if (wait)
@@ -89,8 +93,6 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
 
-        AddBaseRoom();
-
         DivideRooms();
 
         AddPreservedRooms();
@@ -108,49 +110,40 @@ public class DungeonGeneratorScript : MonoBehaviour
         DrawRooms();
     }
 
-    private void AddBaseRoom()
-    {
-        finalRooms.Clear();
-
-        RectInt baseRoom = startRoomParams;
-        finalRooms.Add(baseRoom);
-    }
-
     private void DivideRooms()
     {
-        keepDividing = true;
-        int generation = 0;
+        finalRooms.Clear();
+        roomsPreserved.Clear();
 
-        while (keepDividing)
+        DivideRoomRecursive(startRoomParams, 1);
+    }
+
+    private void DivideRoomRecursive(RectInt room, int generation)
+    {
+        bool stopSplitting = StopSplitting(generation);
+
+        if (!TrySplit(room, out RectInt roomA, out RectInt roomB))
         {
-            keepDividing = false;
-            generation++;
-
-            foreach (var room in finalRooms)
-            {
-                if (TrySplit(room, out RectInt roomA, out RectInt roomB))
-                {
-                    bool preserveRoom = PreserveRoom(generation);
-
-                    if (preserveRoom)
-                    {
-                        QueuePreservedRoom(room);
-                        continue;
-                    }
-
-                    QueueRoomSplit(room, roomA, roomB);
-                }
-            }
-            ApplyQueuedRoomChanges();
-
-            bool stopSplitting = StopSplitting(generation);
-
-            if (stopSplitting)
-            {
-                AlgorithmsUtils.DebugRectInt(startRoomParams, Color.red, 5f);
-                break;
-            }
+            finalRooms.Add(room);
+            return;
         }
+
+        if (stopSplitting)
+        {
+            finalRooms.Add(room);
+            return;
+        }
+
+        bool preserveRoom = PreserveRoom(generation);
+
+        if (preserveRoom)
+        {
+            roomsPreserved.Add(room);
+            return;
+        }
+
+        DivideRoomRecursive(roomA, generation + 1);
+        DivideRoomRecursive(roomB, generation + 1);
     }
 
     private bool TrySplit(RectInt room, out RectInt roomA, out RectInt roomB)
@@ -158,12 +151,29 @@ public class DungeonGeneratorScript : MonoBehaviour
         roomA = default;
         roomB = default;
 
-        if (RandomBool())
-        {
-            // X
-            if (room.width < minRoomSize * 2)
-                return false;
+        bool canSplitX = room.width >= minRoomSize * 2;
+        bool canSplitY = room.height >= minRoomSize * 2;
 
+        if (!canSplitX && !canSplitY)
+            return false;
+
+        bool splitX;
+
+        if (canSplitX && canSplitY)
+        {
+            splitX = RandomBool();
+        }
+        else if (canSplitX)
+        {
+            splitX = true;
+        }
+        else
+        {
+            splitX = false;
+        }
+
+        if (splitX)
+        {
             int aWidth = GetRandomSplitSize(room.width);
             int bWidth = room.width - aWidth;
 
@@ -174,10 +184,6 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
         else
         {
-            // Y
-            if (room.height < minRoomSize * 2)
-                return false;
-
             int aHeight = GetRandomSplitSize(room.height);
             int bHeight = room.height - aHeight;
 
@@ -222,34 +228,6 @@ public class DungeonGeneratorScript : MonoBehaviour
         return UnityEngine.Random.Range(0, 100) < stopSplittingChance;
     }
 
-    private void QueueRoomSplit(RectInt oldRoom, RectInt roomA, RectInt roomB)
-    {
-        roomsToRemove.Add(oldRoom);
-        newRooms.Add(roomA);
-        newRooms.Add(roomB);
-        keepDividing = true;
-    }
-
-    private void QueuePreservedRoom(RectInt room)
-    {
-        roomsPreserved.Add(room);
-        roomsToRemove.Add(room);
-        keepDividing = true;
-    }
-
-    private void ApplyQueuedRoomChanges()
-    {
-        foreach (var room in roomsToRemove)
-            finalRooms.Remove(room);
-
-        roomsToRemove.Clear();
-
-        foreach (var room in newRooms)
-            finalRooms.Add(room);
-
-        newRooms.Clear();
-    }
-
     private void AddPreservedRooms()
     {
         foreach (var room in roomsPreserved)
@@ -261,50 +239,29 @@ public class DungeonGeneratorScript : MonoBehaviour
     private void RemoveSmallestRooms()
     {
         roomsToRemove.Clear();
-        int smallRoomsToRemove = (int)(finalRooms.Count / 10);
+        int smallRoomsToRemove = (int)(finalRooms.Count * deleteRoomPercentage / 100);
         Debug.Log($"Rooms to remove: {smallRoomsToRemove}");
         int removedRooms = 0;
         List<RectInt> roomPool = new List<RectInt>(finalRooms);
+        roomPool.Sort((a, b) => (a.width * a.height).CompareTo(b.width * b.height));
+
         for (int i = 0; i < smallRoomsToRemove; i++)
         {
-            RectInt smallestRoom;
-            float size;
             bool removed = false;
             while (!removed && roomPool.Count() > 0)
             {
-                smallestRoom = roomPool[0];
-                size = smallestRoom.width * smallestRoom.height;
-
-                foreach (var room in roomPool)
+                RectInt room = roomPool[0];
+                if (CanRemove(room))
                 {
-                    float currentRoomSize = room.width * room.height;
-                    if (size > currentRoomSize)
-                        size = currentRoomSize;
+                    roomsToRemove.Add(room);
+                    removed = true;
+                    finalRooms.Remove(room);
+                    roomPool.Remove(room);
+                    removedRooms++;
                 }
-
-                foreach (var room in roomPool)
-                {
-                    float currentRoomSize = room.width * room.height;
-                    if (!removed && size == currentRoomSize)
-                    {
-                        if (CanRemove(room))
-                        {
-                            roomsToRemove.Add(room);
-                            roomPool.Remove(room);
-                            removed = true;
-                        }
-                        else
-                            roomPool.Remove(room);
-
-                        break;
-                    }
-                }
+                else
+                    roomPool.Remove(room);
             }
-        }
-        foreach (var room in roomsToRemove)
-        {
-            finalRooms.Remove(room);
-            removedRooms++;
         }
 
         Debug.Log($"Rooms removed: {removedRooms}");
@@ -334,7 +291,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
                 RectInt intersection = AlgorithmsUtils.Intersect(currentRoom, otherRoom);
 
-                if (intersection.height > 1 || intersection.width > 1)
+                if (IsVerticalIntersection(intersection) || IsHorizontalIntersection(intersection))
                 {
                     visitedRooms.Add(otherRoom);
                     roomsToCheck.Enqueue(otherRoom);
@@ -728,12 +685,8 @@ public class DungeonGeneratorScript : MonoBehaviour
         graph = new Vector3Graph();
         DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
 
-        AddBaseRoom();
-
         yield return StartCoroutine(SlowDivideRooms());
-
         AddPreservedRooms();
-
         yield return StartCoroutine(SlowRemoveSmallestRooms());
 
         //Doors depend on intersections, and walls depend on doors.
@@ -747,120 +700,96 @@ public class DungeonGeneratorScript : MonoBehaviour
 
     private IEnumerator SlowDivideRooms()
     {
-        keepDividing = true;
-        int generation = 0;
+        finalRooms.Clear();
+        roomsPreserved.Clear();
 
-        while (keepDividing)
+        yield return StartCoroutine(SlowDivideRoomRecursive(startRoomParams, 1));
+    }
+
+    private IEnumerator SlowDivideRoomRecursive(RectInt room, int generation)
+    {
+        bool stopSplitting = StopSplitting(generation);
+
+        if (!TrySplit(room, out RectInt roomA, out RectInt roomB))
         {
-            keepDividing = false;
-            generation++;
+            finalRooms.Add(room);
 
-            foreach (var room in finalRooms)
+            DebugDrawingBatcher.GetInstance().BatchCall(() =>
             {
-                if (TrySplit(room, out RectInt roomA, out RectInt roomB))
-                {
-                    bool preserveRoom = PreserveRoom(generation);
+                AlgorithmsUtils.DebugRectInt(room, Color.yellow);
+            });
 
-                    if (preserveRoom)
-                    {
-                        DebugDrawingBatcher.GetInstance().BatchCall(() =>
-                        {
-                            AlgorithmsUtils.DebugRectInt(room, Color.blue);
-                        });
-                        yield return new WaitForSeconds(0.3f);
-
-                        QueuePreservedRoom(room);
-                        continue;
-                    }
-
-                    DebugDrawingBatcher.GetInstance().BatchCall(() =>
-                    {
-                        AlgorithmsUtils.DebugRectInt(room, Color.green);
-                    });
-                    yield return new WaitForSeconds(0.3f);
-
-                    DebugDrawingBatcher.GetInstance().BatchCall(() =>
-                    {
-                        AlgorithmsUtils.DebugRectInt(roomA, Color.yellow);
-                        AlgorithmsUtils.DebugRectInt(roomB, Color.yellow);
-                    });
-                    yield return new WaitForSeconds(0.1f);
-
-                    QueueRoomSplit(room, roomA, roomB);
-                }
-            }
-            ApplyQueuedRoomChanges();
-
-            bool stopSplitting = StopSplitting(generation);
-
-            if (stopSplitting)
-            {
-                AlgorithmsUtils.DebugRectInt(startRoomParams, Color.red, 2f);
-                break;
-            }
+            yield return new WaitForSeconds(0.0001f);
+            yield break;
         }
+
+        bool preserveRoom = PreserveRoom(generation);
+
+        if (preserveRoom)
+        {
+            roomsPreserved.Add(room);
+
+            DebugDrawingBatcher.GetInstance().BatchCall(() =>
+            {
+                AlgorithmsUtils.DebugRectInt(room, Color.blue);
+            });
+
+            yield return new WaitForSeconds(0.001f);
+            yield break;
+        }
+
+        DebugDrawingBatcher.GetInstance().BatchCall(() =>
+        {
+            AlgorithmsUtils.DebugRectInt(room, Color.green);
+        });
+
+        yield return new WaitForSeconds(0.001f);
+
+        DebugDrawingBatcher.GetInstance().BatchCall(() =>
+        {
+            AlgorithmsUtils.DebugRectInt(roomA, Color.yellow);
+            AlgorithmsUtils.DebugRectInt(roomB, Color.yellow);
+        });
+
+        yield return new WaitForSeconds(0.001f);
+
+        yield return StartCoroutine(SlowDivideRoomRecursive(roomA, generation + 1));
+        yield return StartCoroutine(SlowDivideRoomRecursive(roomB, generation + 1));
     }
 
     private IEnumerator SlowRemoveSmallestRooms()
     {
         roomsToRemove.Clear();
-
-        int smallRoomsToRemove = (int)(finalRooms.Count / 10);
-        List<RectInt> roomPool = new List<RectInt>(finalRooms);
-
+        int smallRoomsToRemove = (int)(finalRooms.Count * deleteRoomPercentage / 100);
         Debug.Log($"Rooms to remove: {smallRoomsToRemove}");
         int removedRooms = 0;
-
-        RectInt smallestRoom;
-        float size;
-
+        List<RectInt> roomPool = new List<RectInt>(finalRooms);
+        roomPool.Sort((a, b) => (a.width * a.height).CompareTo(b.width * b.height));
 
         for (int i = 0; i < smallRoomsToRemove; i++)
         {
             bool removed = false;
             while (!removed && roomPool.Count() > 0)
             {
-                smallestRoom = roomPool[0];
-                size = smallestRoom.width * smallestRoom.height;
-
-                foreach (var room in roomPool)
+                RectInt room = roomPool[0];
+                if (CanRemove(room))
                 {
-                    float currentRoomSize = room.width * room.height;
-                    if (size > currentRoomSize)
-                        size = currentRoomSize;
-                }
-
-                foreach (var room in roomPool)
-                {
-                    float currentRoomSize = room.width * room.height;
-                    if (!removed && size == currentRoomSize)
+                    DebugDrawingBatcher.GetInstance().BatchCall(() =>
                     {
-                        if (CanRemove(room))
-                        {
-                            DebugDrawingBatcher.GetInstance().BatchCall(() =>
-                            {
-                                AlgorithmsUtils.DebugRectInt(room, Color.red);
-                            });
-                            roomsToRemove.Add(room);
-                            roomPool.Remove(room);
-                            removed = true;
-                            yield return new WaitForSeconds(0.5f);
-                        }
-                        else
-                        {
-                            roomPool.Remove(room);
-                        }
-
-                        break;
-                    }
+                        AlgorithmsUtils.DebugRectInt(room, Color.red);
+                    });
+                    roomsToRemove.Add(room);
+                    removed = true;
+                    finalRooms.Remove(room);
+                    roomPool.Remove(room);
+                    removedRooms++;
+                    yield return new WaitForSeconds(0.1f);
                 }
+                else
+                    roomPool.Remove(room);
             }
         }
-        foreach (var room in roomsToRemove)
-        {
-            finalRooms.Remove(room);
-            removedRooms++;
-        }
+
         Debug.Log($"Rooms removed: {removedRooms}");
     }
 
@@ -967,6 +896,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         int cols = tileMap.GetLength(1);
         GameObject wallsParent = new GameObject("Walls");
 
+        int counter = 0;
         for (int i = 0; i <= rows - 2; i++)
         {
             for (int j = 0; j <= cols - 2; j++)
@@ -978,7 +908,13 @@ public class DungeonGeneratorScript : MonoBehaviour
                     GameObject wallToInstantiate = wallPrefabs[prefabNumber];
                     wallToInstantiate.transform.position = new Vector3(i + 1f, 0f, j + 1f);
                     Instantiate(wallToInstantiate, wallsParent.transform);
-                    yield return new WaitForSeconds(0.001f);
+                    if (counter >= floorWaitTime)
+                    {
+                        counter = 0;
+                        yield return null;
+                    }
+                    else
+                        counter++;
                 }
             }
         }
@@ -995,9 +931,10 @@ public class DungeonGeneratorScript : MonoBehaviour
         Vector2Int startTile = GetRandomRoomCenterTile();
 
         HashSet<Vector2Int> reachedTiles = FloodFillFloor(startTile, passableTiles, stopTiles);
-
+        int counter = 0;
         foreach (Vector2Int tile in reachedTiles)
         {
+
             Vector3 position = new Vector3(tile.x, 0f, tile.y);
 
             floorPrefab.transform.position = position;
@@ -1005,8 +942,12 @@ public class DungeonGeneratorScript : MonoBehaviour
             floorPositions.Add(position);
 
             Instantiate(floorPrefab, floorTransform);
-
-            yield return null;
+            if (counter > floorWaitTime*2)
+            {
+                yield return null;
+                counter = 0;
+            }
+            counter++;
         }
     }
 }

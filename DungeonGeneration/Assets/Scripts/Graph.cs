@@ -5,7 +5,7 @@ using UnityEngine;
 
 public class Graph<T>
 {
-    private Dictionary<T, List<T>> nodes;
+    protected Dictionary<T, List<T>> nodes;
 
     public Graph()
     {
