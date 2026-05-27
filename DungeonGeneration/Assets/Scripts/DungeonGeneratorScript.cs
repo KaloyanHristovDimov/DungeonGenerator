@@ -1,16 +1,19 @@
 using NaughtyAttributes;
 using NUnit.Framework;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Unity.AI.Navigation;
+using UnityEditor;
 using UnityEngine;
 
 public class DungeonGeneratorScript : MonoBehaviour
 {
     [Header("Generation Settings")]
     [SerializeField] private int minRoomSize = 8;
-    [SerializeField] private RectInt startRoomParams = new RectInt(0, 0, 100, 100);
+    [SerializeField] private RectInt startRoomParams = new RectInt(0, 0, 200, 200);
     [SerializeField] private float randomSizeMin = 0.05f;
     [SerializeField] private float randomSizeMax = 0.75f;
     [SerializeField] private int generationsBeforePreservedRooms = 8;
@@ -18,7 +21,6 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private int preservedRoomChance = 20;
     [SerializeField] private int stopSplittingChance = 12;
     [SerializeField] private int deleteRoomPercentage = 10;
-    [SerializeField] private int floorWaitTime = 10;
 
     [Header("Prefabs")]
     [SerializeField] private GameObject floorPrefab;
@@ -35,8 +37,17 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private int seed = 1;
     [SerializeField] private bool immediateStart = true;
 
+    [Header("Inspector prep")]
+    [SerializeField] private List<string> objectsToKeepByName = new List<string>() 
+    {
+        "Dungeon Generator",
+        "General light",
+        "DebugDrawingBatcher_default"
+    };
+
     private Vector3Graph graph;
     private Transform dungeonParent;
+    private float WaitTime;
 
     private List<RectInt> roomsPreserved = new List<RectInt>();
     private List<RectInt> finalRooms = new List<RectInt>();
@@ -66,14 +77,14 @@ public class DungeonGeneratorScript : MonoBehaviour
 
     void Start()
     {
-        floorWaitTime = (startRoomParams.height + startRoomParams.width) / 20;
+        WaitTime = (startRoomParams.height + startRoomParams.width) / 20;
         SeedPick();
         graph = new Vector3Graph();
-        if(immediateStart)
+        if (immediateStart)
             if (wait)
-                StartCoroutine(SlowGenerateDungeon());
+                StartGenerateDungeon();
             else
-                GenerateDungeon();
+                StartSlowGenerateDungeon();
     }
 
     private void SeedPick()
@@ -86,12 +97,16 @@ public class DungeonGeneratorScript : MonoBehaviour
     }
 
     //Immediate generation
-    [Button]
-    private void GenerateDungeon()
+    [Button("Generate Dungeon")]
+    private void StartGenerateDungeon()
     {
-        graph = new Vector3Graph();
+        StopAllCoroutines();
+        StartCoroutine(GenerateDungeon());
+    }
 
-        DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
+    private IEnumerator GenerateDungeon()
+    {
+        yield return StartCoroutine(PrepareSceneForGeneration());
 
         DivideRooms();
 
@@ -101,6 +116,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         //Doors depend on intersections, and walls depend on doors.
         FindIntersections();
+        DecideDoors();
         RemoveExtraDoors();
         graph.PrintGraph();
         SpawnAssets();
@@ -110,20 +126,51 @@ public class DungeonGeneratorScript : MonoBehaviour
         DrawRooms();
     }
 
-    private void ClearGeneratedParent()
+    private IEnumerator PrepareSceneForGeneration()
     {
+        DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
+        ClearUnityConsole();
+        graph = new Vector3Graph();
+
         GameObject oldDungeon = GameObject.Find("Dungeon");
 
         if (oldDungeon != null)
         {
-            if (Application.isPlaying)
-                Destroy(oldDungeon);
-            else
-                DestroyImmediate(oldDungeon);
+            DestroyObjectSafe(oldDungeon);
+        }
+
+        GameObject[] rootObjects = UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects();
+
+        foreach (GameObject obj in rootObjects)
+        {
+            if (!objectsToKeepByName.Contains(obj.name))
+                DestroyObjectSafe(obj);
         }
 
         GameObject newDungeon = new GameObject("Dungeon");
         dungeonParent = newDungeon.transform;
+        yield return null;
+    }
+
+    private void ClearUnityConsole()
+    {
+        Assembly assembly = Assembly.GetAssembly(typeof(Editor));
+        Type logEntries = assembly.GetType("UnityEditor.LogEntries");
+
+        MethodInfo clearMethod = logEntries.GetMethod(
+            "Clear",
+            BindingFlags.Static | BindingFlags.Public
+        );
+
+        clearMethod.Invoke(null, null);
+    }
+
+    private void DestroyObjectSafe(GameObject obj)
+    {
+        if (Application.isPlaying)
+            Destroy(obj);
+        else
+            DestroyImmediate(obj);
     }
 
     private void DivideRooms()
@@ -250,13 +297,13 @@ public class DungeonGeneratorScript : MonoBehaviour
         {
             finalRooms.Add(room);
         }
+        Debug.Log($"Made {finalRooms.Count} rooms");
     }
 
     private void RemoveSmallestRooms()
     {
         roomsToRemove.Clear();
         int smallRoomsToRemove = (int)(finalRooms.Count * deleteRoomPercentage / 100);
-        Debug.Log($"Rooms to remove: {smallRoomsToRemove}");
         int removedRooms = 0;
         List<RectInt> roomPool = new List<RectInt>(finalRooms);
         roomPool.Sort((a, b) => (a.width * a.height).CompareTo(b.width * b.height));
@@ -338,7 +385,6 @@ public class DungeonGeneratorScript : MonoBehaviour
                 }
             }
         }
-        DecideDoors();
     }
 
     private void AddSharedWallLine(RectInt intersection, Vector3 roomA, Vector3 roomB)
@@ -400,6 +446,7 @@ public class DungeonGeneratorScript : MonoBehaviour
             graph.AddEdge(line.roomA, doorPosition);
             graph.AddEdge(doorPosition, line.roomB);
         }
+        Debug.Log($"Made {doors.Count} doors");
     }
 
     private void RemoveExtraDoors()
@@ -410,6 +457,8 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         ShuffleList(doorPool);
 
+        int doorsRemoved = 0;
+
         foreach (var wallDoor in doorPool)
         {
             Vector3 graphDoor = new Vector3(wallDoor.x - 0.5f, wallDoor.y - 0.5f, wallDoor.z - 0.5f);
@@ -418,8 +467,11 @@ public class DungeonGeneratorScript : MonoBehaviour
                 graph.RemoveNode(graphDoor);
 
                 doors.Remove(wallDoor);
+
+                doorsRemoved++;
             }
         }
+        Debug.Log($"Removed {doorsRemoved} doors");
     }
 
     private List<Vector3> GetRoomNodes()
@@ -706,19 +758,24 @@ public class DungeonGeneratorScript : MonoBehaviour
     }
 
     //Slow debug generation
-    [Button]
+    [Button("Slow Generate Dungeon")]
+    private void StartSlowGenerateDungeon() 
+    {
+        StopAllCoroutines();
+        StartCoroutine(SlowGenerateDungeon());
+    }
+
     private IEnumerator SlowGenerateDungeon()
     {
-        graph = new Vector3Graph();
-
-        DebugDrawingBatcher.GetInstance().ClearAllBatchedCalls();
+        yield return StartCoroutine(PrepareSceneForGeneration());
 
         yield return StartCoroutine(SlowDivideRooms());
         AddPreservedRooms();
         yield return StartCoroutine(SlowRemoveSmallestRooms());
 
         //Doors depend on intersections, and walls depend on doors.
-        yield return StartCoroutine(SlowFindIntersections());
+        FindIntersections();
+        yield return StartCoroutine(SlowDecideDoors());
         yield return StartCoroutine(SlowRemoveExtraDoors());
         yield return StartCoroutine(graph.SlowPrintGraph());
         yield return StartCoroutine(SlowSpawnAssets());
@@ -811,7 +868,7 @@ public class DungeonGeneratorScript : MonoBehaviour
                     finalRooms.Remove(room);
                     roomPool.Remove(room);
                     removedRooms++;
-                    yield return new WaitForSeconds(0.1f);
+                    yield return new WaitForSeconds(0.01f);
                 }
                 else
                     roomPool.Remove(room);
@@ -819,29 +876,6 @@ public class DungeonGeneratorScript : MonoBehaviour
         }
 
         Debug.Log($"Rooms removed: {removedRooms}");
-    }
-
-    private IEnumerator SlowFindIntersections()
-    {
-        sharedWallLines.Clear();
-        for (int i = 0; i < finalRooms.Count; i++)
-        {
-            for (int j = i + 1; j < finalRooms.Count; j++)
-            {
-                RectInt roomA = finalRooms[i];
-                RectInt roomB = finalRooms[j];
-                if (roomB != roomA)
-                {
-                    RectInt intersection = AlgorithmsUtils.Intersect(roomB, roomA);
-
-                    Vector3 roomAPosition = new Vector3(roomA.center.x, 0f, roomA.center.y);
-                    Vector3 roomBPosition = new Vector3(roomB.center.x, 0f, roomB.center.y);
-
-                    AddSharedWallLine(intersection, roomAPosition, roomBPosition);
-                }
-            }
-        }
-        yield return StartCoroutine(SlowDecideDoors());
     }
 
     private IEnumerator SlowDecideDoors()
@@ -877,6 +911,7 @@ public class DungeonGeneratorScript : MonoBehaviour
             graph.AddEdge(line.roomA, doorPosition);
             graph.AddEdge(doorPosition, line.roomB);
         }
+        Debug.Log($"Made {doors.Count} doors");
     }
 
     private IEnumerator SlowRemoveExtraDoors()
@@ -887,6 +922,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
         ShuffleList(doorPool);
 
+        int doorsRemoved = 0;
         foreach (var wallDoor in doorPool)
         {
             Vector3 graphDoor = new Vector3(wallDoor.x - 0.5f, wallDoor.y - 0.5f, wallDoor.z - 0.5f);
@@ -902,9 +938,12 @@ public class DungeonGeneratorScript : MonoBehaviour
 
                 doors.Remove(wallDoor);
 
-                yield return new WaitForSeconds(0.1f);
+                doorsRemoved++;
+
+                yield return new WaitForSeconds(0.01f);
             }
         }
+        Debug.Log($"Removed {doorsRemoved} doors");
     }
 
     private IEnumerator SlowSpawnAssets()
@@ -937,7 +976,7 @@ public class DungeonGeneratorScript : MonoBehaviour
                     GameObject wallToInstantiate = wallPrefabs[prefabNumber];
                     wallToInstantiate.transform.position = new Vector3(i + 1f, 0f, j + 1f);
                     Instantiate(wallToInstantiate, wallsParent.transform);
-                    if (counter >= floorWaitTime)
+                    if (counter >= WaitTime)
                     {
                         counter = 0;
                         yield return null;
@@ -975,7 +1014,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
             Instantiate(floorPrefab, floorTransform);
             
-            if (counter > floorWaitTime*2)
+            if (counter > WaitTime*3)
             {
                 yield return null;
                 counter = 0;
@@ -985,17 +1024,5 @@ public class DungeonGeneratorScript : MonoBehaviour
             if (passableTiles.Contains(tile) && !stopTiles.Contains(tile))
                 playerSpawnPositions.Add(position);
         }
-    }
-
-    [Button]
-    private IEnumerator RegenerateDungeon()
-    {
-        ClearGeneratedParent();
-
-        yield return null;
-        if (wait)
-            yield return StartCoroutine(SlowGenerateDungeon());
-        else
-            GenerateDungeon();
     }
 }
