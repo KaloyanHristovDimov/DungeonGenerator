@@ -19,7 +19,7 @@ using UnityEngine;
 /// </summary>
 public class DungeonGeneratorScript : MonoBehaviour
 {
-    #region Global Variables
+    #region Class fields
     [Header("Generation Settings")]
     // Controls the size, randomness, recursion depth, room preservation,
     // stopping chance, and percentage of small rooms removed after generation.
@@ -62,7 +62,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
     private Vector3Graph graph;
     private Transform dungeonParent;
-    private float WaitTime;
+    private float waitTime;
 
     // Main room collections.
     // roomsPreserved stores rooms that stopped splitting early because of preservation.
@@ -113,14 +113,14 @@ public class DungeonGeneratorScript : MonoBehaviour
     /// </summary>
     void Start()
     {
-        WaitTime = (startRoomParams.height + startRoomParams.width) / 20;
+        waitTime = (startRoomParams.height + startRoomParams.width) / 20;
         SeedPick();
         graph = new Vector3Graph();
         if (immediateStart)
             if (useSlowGenerationImmediately)
-                StartGenerateDungeon();
-            else
                 StartSlowGenerateDungeon();
+            else
+                StartGenerateDungeon();
     }
 
     /// <summary>
@@ -417,7 +417,7 @@ public class DungeonGeneratorScript : MonoBehaviour
         for (int i = 0; i < smallRoomsToRemove; i++)
         {
             bool removed = false;
-            while (!removed && roomPool.Count() > 0)
+            while (!removed && roomPool.Count > 0)
             {
                 RectInt room = roomPool[0];
                 if (CanRemove(room))
@@ -1215,7 +1215,7 @@ public class DungeonGeneratorScript : MonoBehaviour
                     GameObject wallToInstantiate = wallPrefabs[prefabNumber];
                     wallToInstantiate.transform.position = new Vector3(i + 1f, 0f, j + 1f);
                     Instantiate(wallToInstantiate, wallsParent.transform);
-                    if (counter >= WaitTime)
+                    if (counter >= waitTime)
                     {
                         counter = 0;
                         yield return null;
@@ -1257,7 +1257,7 @@ public class DungeonGeneratorScript : MonoBehaviour
 
             Instantiate(floorPrefab, floorTransform);
             
-            if (counter > WaitTime*3)
+            if (counter > waitTime*3)
             {
                 yield return null;
                 counter = 0;
