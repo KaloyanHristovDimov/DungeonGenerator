@@ -1,0 +1,7 @@
+Ideas for improvement:
+	- Simplify room removal algorithm
+	- Switch to using an algorithm syntax so code can be executed in steps
+	- Make player slow down less
+	- Make visualization togglable and the timings changable from the inspector
+	- Add creatures and furniture to populate dungeon
+	- Make different types of dungeons
