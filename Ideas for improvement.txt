@@ -1,40 +1,13 @@
 Ideas for improvement:
-	- Simplify room removal algorithm by generating spaning tree before trying to remove room and then checking instead of the other way around
-	- Switch to using an algorithm syntax so code can be executed in steps
-	- Make player slow down less
-	- Make visualization togglable and the timings changable from the inspector
-	- Add creatures and furniture to populate dungeon
-	- Make different types of dungeons
-
-
-
-
-
-
-
-
-
-1. Improve chart to detail an algorithm for sufficient
-2. Good
-3. Sufficient ~ Good
-4. Excelent
-5. Learn a bit more about the Big O notation of my algorithms; Improve suggestions to make them more concrete
-6. Most likely excelent
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+	Simplify room removal algorithm:
+Instead of repeatedly testing room removal by checking connectivity each time, first generate a graph/spanning tree of required room connections. Then only remove rooms that are not needed for the connected structure. This would make the algorithm cleaner and potentially more efficient.
+	Use DOTween sequencing for generation timing:
+The dungeon generation steps could be placed into a DOTween sequence so each stage takes a consistent amount of time. This would make the visual generation process smoother and easier to control, instead of depending on coroutine waits that may feel inconsistent.
+	Improve player movement through NavMesh settings:
+The player movement could be improved by tweaking the NavMeshAgent settings, such as speed, acceleration, angular speed, stopping distance, and obstacle avoidance. This would make moving through the dungeon feel faster, smoother, and less clunky.
+	Add limited room decoration:
+A small number of simple objects, such as crates, barrels, torches, tables, or chests, could be placed in rooms to make them feel less empty. This should stay limited so it does not block movement or make the generation system too complex.
+	Add different dungeon themes:
+Different dungeon types could use different generation settings, prefabs, and decorations. For example, a castle could have more big rectangular rooms, while a temple could have a big room in the center.
+	Improve performance with better data structures:
+Some repeated list searches could be replaced with HashSet or Dictionary lookups. For example, door positions, wall positions, and room connections could be stored in faster structures to improve performance on larger dungeons.

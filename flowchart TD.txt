@@ -1,0 +1,159 @@
+flowchart TD
+    A[Start Game] --> B{Immediate Start?}
+
+    B -- Yes --> C[Start Dungeon Generation]
+    B -- No --> D[Wait for Generate Dungeon Button]
+    D --> C
+
+    C --> E[Pick Seed]
+    E --> F[Stop Existing Coroutines]
+    F --> G[Start GenerateDungeon Coroutine]
+
+    G --> H[Set isGenerating = true]
+    H --> I[Start Preparing Scene for Generation]
+
+    I --> I1[Clear Debug Drawings]
+    I1 --> I2[Clear Unity Console]
+    I2 --> I3[Reset Graph]
+    I3 --> I4[Delete Old Dungeon]
+    I4 --> I5[Delete Unwanted Root Objects]
+    I5 --> I6[Create New Dungeon Parent]
+
+    I6 --> J{Generation Type?}
+    J -- KeyBased --> K[Wait for Player Input]
+    J -- Instant or Slow --> L[Continue]
+    K --> L
+
+    L --> M[Start Room Generation]
+
+    M --> M1[Clear Room Lists]
+    M1 --> M2[Recursively Divide Starting Room]
+    M2 --> M3{Can Room Split?}
+
+    M3 -- No --> M4[Add Room to Final Rooms]
+    M3 -- Yes --> M5{Preserve Room?}
+
+    M5 -- Yes --> M6[Add Room to Preserved Rooms]
+    M5 -- No --> M7[Split Room Into Two Rooms]
+    M7 --> M8[Repeat Recursion for Both Rooms]
+
+    M4 --> M9[Add Preserved Rooms Back]
+    M6 --> M9
+    M8 --> M2
+
+    M9 --> M10{Instant or KeyBased?}
+    M10 -- Yes --> M11[Draw Final Room Outlines]
+    M10 -- No --> M12[Skip Full Room Outline Drawing]
+    M11 --> M13[Start Removing Smallest Rooms]
+    M12 --> M13
+
+    M13 --> M14[Sort Rooms by Area]
+    M14 --> M15[Try Removing Smallest Room]
+    M15 --> M16{Would Removing Room Keep Dungeon Connected?}
+    M16 -- Yes --> M17[Remove Room]
+    M16 -- No --> M18[Keep Room]
+    M17 --> M19[Repeat Until Target Removal Count Reached]
+    M18 --> M19
+
+    M19 --> N{Generation Type?}
+    N -- KeyBased --> O[Wait for Player Input]
+    N -- Instant or Slow --> P[Continue]
+    O --> P
+
+    P --> Q[Start Door Generation]
+
+    Q --> Q1[Find Shared Wall Intersections]
+    Q1 --> Q2[Create Shared Wall Lines]
+    Q2 --> Q3[Place One Door on Each Shared Wall]
+    Q3 --> Q4[Add Door Connections to Graph]
+    Q4 --> Q5{Generation Type?}
+    Q5 -- KeyBased --> Q6[Wait for Player Input]
+    Q5 -- Instant or Slow --> Q7[Continue]
+    Q6 --> Q7
+    Q7 --> Q8[Start Removing Extra Doors]
+    Q8 --> Q9[Shuffle Door List]
+    Q9 --> Q10{Can Door Be Removed Without Disconnecting Rooms?}
+    Q10 -- Yes --> Q11[Remove Door from Graph and Door List]
+    Q10 -- No --> Q12[Keep Door]
+    Q11 --> Q13[Repeat for All Doors]
+    Q12 --> Q13
+
+    Q13 --> R{Generation Type?}
+    R -- KeyBased --> S[Wait for Player Input]
+    R -- Instant or Slow --> T[Continue]
+    S --> T
+
+    T --> U[Visualize Graph]
+    U --> U1{Generation Type?}
+    U1 -- Instant or KeyBased --> U2[Print Full Graph]
+    U1 -- Slow --> U3[Slowly Print Graph]
+
+    U2 --> V{Generation Type?}
+    U3 --> V
+    V -- KeyBased --> W[Wait for Player Input]
+    V -- Instant or Slow --> X[Continue]
+    W --> X
+
+    X --> Y[Start Spawning Assets]
+
+    Y --> Y1[Clear Wall and Floor Positions]
+    Y1 --> Y2[Start Spawning Walls]
+    Y2 --> Y3[Calculate Wall Positions]
+    Y3 --> Y4[Generate Wall Tile Map]
+    Y4 --> Y5[Use 2x2 Marching Squares Pattern]
+    Y5 --> Y6[Spawn Wall Prefabs]
+    Y6 --> Y7[Finish Spawning Walls]
+
+    Y7 --> Z[Start Spawning Floor]
+    Z --> Z1[Clear Player Spawn Positions]
+    Z1 --> Z2[Create Floor Parent Object]
+    Z2 --> Z3[Build Passable Floor Tiles]
+    Z3 --> Z4[Add Interior Room Tiles]
+    Z4 --> Z5[Add Door Tiles]
+    Z5 --> Z6[Build Wall Stop Tiles]
+    Z6 --> Z7[Add Wall Positions as Stop Tiles]
+    Z7 --> Z8[Pick Random Room Center Tile]
+    Z8 --> Z9[Start Flood Fill]
+    Z9 --> Z10[Create Visited Set]
+    Z10 --> Z11[Create Queue]
+    Z11 --> Z12[Add Start Tile to Visited and Queue]
+
+    Z12 --> Z13{Queue Empty?}
+    Z13 -- Yes --> Z14[Return Reached Tiles]
+    Z13 -- No --> Z15[Take Next Tile from Queue]
+
+    Z15 --> Z16{Is Current Tile a Stop Tile?}
+    Z16 -- Yes --> Z13
+    Z16 -- No --> Z17[Check Four Neighbours]
+
+    Z17 --> Z18{Neighbour Already Visited?}
+    Z18 -- Yes -->Z17
+    Z18 -- No --> Z19{Neighbour Passable or Stop Tile?}
+
+    Z19 -- No --> Z17
+    Z19 -- Yes --> Z20[Add Neighbour to Visited]
+
+    Z20 --> Z21{Neighbour Passable?}
+    Z21 -- Yes --> Z22[Add Neighbour to Queue]
+    Z21 -- No --> Z17
+    Z22 --> Z17
+
+    Z14 --> Z23[Spawn Floor Tiles at Reached Positions]
+    Z23 --> Z24[Save Valid Player Spawn Positions]
+    Z24 --> Z25[Finish Floor Spawning]
+
+    Z25 --> AA{Generation Type?}
+    AA -- KeyBased --> AB[Wait for Player Input]
+    AA -- Instant or Slow --> AC[Continue]
+    AB --> AC
+
+    AC --> AD[Start Spawning Gameplay Objects]
+    AD --> AD1[Spawn NavMesh Object]
+    AD1 --> AD2[Build NavMesh]
+    AD2 --> AD3[Pick Random Player Spawn Position]
+    AD3 --> AD4[Spawn Player]
+    AD4 --> AD5[Spawn Camera]
+    AD5 --> AD6[Add Player Controller]
+    AD6 --> AD7[Spawn UI and Event System]
+    AD7 --> AE[Set isGenerating = false]
+    AE --> AF[Dungeon Generation Complete]
