@@ -19,6 +19,7 @@ using UnityEngine;
 public class DungeonGeneratorScript : MonoBehaviour
 {
     #region Class Fields
+
     [Header("Generation Settings")]
     // Controls the size, randomness, recursion depth, room preservation,
     // stopping chance, and percentage of small rooms removed after generation.
@@ -29,6 +30,7 @@ public class DungeonGeneratorScript : MonoBehaviour
     [SerializeField] private int generationsBeforePreservedRooms = 8;
     [SerializeField] private int preservedRoomChance = 20;
     [SerializeField] private int deleteRoomPercentage = 50;
+    
 
     [Header("Prefabs")]
     // Prefabs spawned after the logical dungeon layout has been generated.
@@ -45,6 +47,8 @@ public class DungeonGeneratorScript : MonoBehaviour
     // wait controls whether generation is visualized slowly or created immediately.
     // useRandomSeed decides whether the seed is randomized each run.
     [SerializeField] private GenerationType generationType = GenerationType.Instant;
+    //[ShowIf(nameof(showOptionalStuff))]
+    [ShowIf(nameof(ShouldShowNextStepKeySelector))]
     [SerializeField] private KeyCode executeNextStepKey = KeyCode.Space;
     [SerializeField] private bool immediateStart = true;
     [SerializeField] private bool useRandomSeed = true;
@@ -70,10 +74,8 @@ public class DungeonGeneratorScript : MonoBehaviour
     // Main room collections.
     // roomsPreserved stores rooms that stopped splitting early because of preservation.
     // finalRooms contains the rooms used for the final dungeon layout.
-    // roomsToRemove stores rooms selected for deletion.
     private List<RectInt> roomsPreserved = new List<RectInt>();
     private List<RectInt> finalRooms = new List<RectInt>();
-    private List<RectInt> roomsToRemove = new List<RectInt>();
 
     // Generated world-space positions used for spawning and path/floor logic.
     private List<Vector3> wallPositions = new List<Vector3>();
@@ -242,7 +244,7 @@ public class DungeonGeneratorScript : MonoBehaviour
     /// Runs the full dungeon generation pipeline.
     /// Slow-only debug drawing and waiting are controlled by the selected generation type.
     /// </summary>
-    private IEnumerator GenerateDungeon()
+    public IEnumerator GenerateDungeon()
     {
         isGenerating = true;
         yield return StartCoroutine(PrepareSceneForGeneration());
@@ -478,7 +480,7 @@ public class DungeonGeneratorScript : MonoBehaviour
     /// </summary>
     private IEnumerator RemoveSmallestRooms()
     {
-        roomsToRemove.Clear();
+        List<RectInt> roomsToRemove = new List<RectInt>();
         int smallRoomsToRemove = (int)(finalRooms.Count * deleteRoomPercentage / 100);
         Debug.Log($"Rooms to remove: {smallRoomsToRemove}");
         int removedRooms = 0;
@@ -1165,6 +1167,11 @@ public class DungeonGeneratorScript : MonoBehaviour
     private bool RandomBool()
     {
         return UnityEngine.Random.Range(0, 2) == 0;
+    }
+
+    public bool ShouldShowNextStepKeySelector()
+    {
+        return generationType == GenerationType.KeyBased;
     }
 
     /// <summary>
