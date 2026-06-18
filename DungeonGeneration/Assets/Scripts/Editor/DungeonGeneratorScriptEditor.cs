@@ -141,7 +141,7 @@ public class DungeonGeneratorScriptEditor : Editor
 
         if (GUILayout.Button("Generate Dungeon"))
         {
-            script.GenerateDungeon();
+            script.StartDungeonGeneration();
         }
     }
 }

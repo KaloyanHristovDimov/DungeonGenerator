@@ -215,7 +215,7 @@ public class DungeonGeneratorScript : MonoBehaviour
     /// allowing regeneration to safely replace an in-progress generation.
     /// </summary>
     [Button("Generate Dungeon", EButtonEnableMode.Playmode)]
-    private void StartDungeonGeneration()
+    public void StartDungeonGeneration()
     {
         SeedPick();
         StopAllCoroutines();
